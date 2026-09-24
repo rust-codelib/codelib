@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = ["gf2m", "rs-codes"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.81"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/<user>/codelib"
+
+[workspace.dependencies]
+proptest = "1.5"
+criterion = "0.5"
