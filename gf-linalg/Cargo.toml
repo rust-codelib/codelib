@@ -1,0 +1,15 @@
+[package]
+name = "gf-linalg"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Линейная алгебра над конечным полем GF(256)"
+
+[dependencies]
+gf2m = { path = "../gf2m", version = "1.0.0" }
+
+[lib]
+name = "gf_linalg"
+path = "src/lib.rs"
