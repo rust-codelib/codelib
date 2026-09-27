@@ -1,0 +1,26 @@
+[package]
+name = "gfpm"
+version = "1.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Конечные поля GF(p^m) для произвольного простого p (p^m <= 2^64): константно-генериковое ядро, арифметика GF(p), полиномиальный слой (Рабин, поиск неприводимых), рантайм-слой, no_std"
+keywords = ["galois", "finite-field", "prime-field", "no_std", "math"]
+categories = ["mathematics", "no-std", "algorithms", "embedded"]
+
+[dependencies]
+# пусто — только core
+
+[dev-dependencies]
+proptest.workspace = true
+criterion.workspace = true
+gf2m = { path = "../gf2m", version = "1.0.0" }
+
+[[bench]]
+name = "field"
+harness = false
+
+[lib]
+name = "gfpm"
+path = "src/lib.rs"

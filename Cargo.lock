@@ -271,6 +271,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "gfpm"
+version = "1.0.0"
+dependencies = [
+ "criterion",
+ "gf2m",
+ "proptest",
+]
+
+[[package]]
 name = "half"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
