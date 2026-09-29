@@ -4,7 +4,16 @@
 //! Библиотека для линейной алгебры над конечным полем GF(256).
 
 mod error;
+mod matrix;
 mod vector;
 
 pub use error::LinalgError;
+pub use matrix::Matrix;
 pub use vector::Vector;
+
+/// Максимальный размер каждой оси матрицы.
+///
+/// Матрица может иметь не более [`MAX_MATRIX_DIM`] строк и не более
+/// [`MAX_MATRIX_DIM`] столбцов. Ограничение применяется отдельно к осям,
+/// поэтому матрица `65 × 65` допустима, хотя содержит больше 4096 элементов.
+pub const MAX_MATRIX_DIM: usize = 4096;
