@@ -16,6 +16,22 @@ pub enum LinalgError {
         /// Число столбцов.
         cols: usize,
     },
+    /// Метод, требующий квадратную матрицу, получил прямоугольную матрицу.
+    ///
+    /// [`crate::Matrix::try_determinant`] и [`crate::Matrix::try_inverse`]
+    /// возвращают этот вариант, если число строк не равно числу столбцов.
+    NonSquareMatrix {
+        /// Число строк исходной матрицы.
+        rows: usize,
+        /// Число столбцов исходной матрицы.
+        cols: usize,
+    },
+    /// Квадратная матрица вырождена и не имеет обратной.
+    ///
+    /// [`crate::Matrix::try_inverse`] возвращает эту ошибку. При этом
+    /// [`crate::Matrix::try_determinant`] успешно возвращает нулевой элемент
+    /// поля.
+    SingularMatrix,
     /// Число элементов не соответствует размерам матрицы.
     ElementCountMismatch {
         /// Ожидаемое число элементов.
@@ -76,6 +92,12 @@ impl fmt::Display for LinalgError {
         match self {
             Self::InvalidDimensions { rows, cols } => {
                 write!(f, "недопустимые размеры матрицы: {rows} × {cols}")
+            }
+            Self::NonSquareMatrix { rows, cols } => {
+                write!(f, "матрица не квадратная: {rows} × {cols}")
+            }
+            Self::SingularMatrix => {
+                write!(f, "матрица вырождена: обратная матрица не существует")
             }
             Self::ElementCountMismatch { expected, actual } => {
                 write!(

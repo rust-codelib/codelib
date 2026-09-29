@@ -135,6 +135,25 @@ fn matrix_vector_length_mismatch_preserves_both_lengths_and_names_the_operation(
 }
 
 #[test]
+fn non_square_matrix_preserves_dimensions_and_has_a_readable_message() {
+    let error = LinalgError::NonSquareMatrix { rows: 2, cols: 3 };
+
+    assert_eq!(error, LinalgError::NonSquareMatrix { rows: 2, cols: 3 });
+    assert_eq!(error.to_string(), "матрица не квадратная: 2 × 3");
+}
+
+#[test]
+fn singular_matrix_has_a_readable_message() {
+    let error = LinalgError::SingularMatrix;
+
+    assert_eq!(error, LinalgError::SingularMatrix);
+    assert_eq!(
+        error.to_string(),
+        "матрица вырождена: обратная матрица не существует"
+    );
+}
+
+#[test]
 fn matrix_addition_rejects_each_shape_mismatch_with_ordered_dimensions() {
     for (left_rows, left_cols, right_rows, right_cols) in [
         (2, 3, 1, 3), // строки отличаются

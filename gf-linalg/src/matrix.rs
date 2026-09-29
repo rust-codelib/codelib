@@ -186,6 +186,176 @@ impl Matrix {
         Ok(Vector::new(data))
     }
 
+    /// Вычисляет определитель квадратной матрицы методом Гаусса над GF(256).
+    ///
+    /// Метод определён только для квадратных матриц. Для квадратной вырожденной
+    /// матрицы результатом будет `Ok(Gf256::zero())`. Прямоугольная матрица
+    /// приводит к [`LinalgError::NonSquareMatrix`] с её фактическими размерами.
+    ///
+    /// Метод заимствует исходную матрицу и не меняет её.
+    ///
+    /// # Errors
+    ///
+    /// Возвращает [`LinalgError::NonSquareMatrix`], если число строк не равно
+    /// числу столбцов.
+    pub fn try_determinant(&self) -> Result<Gf256, LinalgError> {
+        if self.rows != self.cols {
+            return Err(LinalgError::NonSquareMatrix {
+                rows: self.rows,
+                cols: self.cols,
+            });
+        }
+
+        let n = self.rows;
+        let mut work = self.data.clone();
+        let mut determinant = Gf256::one();
+
+        for pivot_col in 0..n {
+            let Some(pivot_row) = (pivot_col..n).find(|&row| !work[row * n + pivot_col].is_zero())
+            else {
+                return Ok(Gf256::zero());
+            };
+
+            if pivot_row != pivot_col {
+                for col in 0..n {
+                    work.swap(pivot_row * n + col, pivot_col * n + col);
+                }
+            }
+
+            let pivot = work[pivot_col * n + pivot_col];
+            determinant *= pivot;
+
+            // Pivot гарантированно ненулевой после поиска выше.
+            let pivot_inverse = pivot.inv();
+            for row in pivot_col + 1..n {
+                let row_offset = row * n;
+                let factor = work[row_offset + pivot_col] * pivot_inverse;
+                if factor.is_zero() {
+                    continue;
+                }
+
+                let pivot_offset = pivot_col * n;
+                for col in pivot_col + 1..n {
+                    let pivot_value = work[pivot_offset + col];
+                    work[row_offset + col] += factor * pivot_value;
+                }
+                work[row_offset + pivot_col] = Gf256::zero();
+            }
+        }
+
+        Ok(determinant)
+    }
+
+    /// Возвращает обратную матрицу квадратной матрицы методом Гаусса–Жордана
+    /// над GF(256).
+    ///
+    /// Метод определён только для квадратных матриц. Если квадратная матрица
+    /// вырождена, обратной матрицы нет и возвращается
+    /// [`LinalgError::SingularMatrix`]. Для прямоугольной матрицы возвращается
+    /// [`LinalgError::NonSquareMatrix`] с её фактическими размерами.
+    /// Метод заимствует исходную матрицу и не меняет её.
+    ///
+    /// # Errors
+    ///
+    /// Возвращает [`LinalgError::NonSquareMatrix`], если число строк не равно
+    /// числу столбцов, или [`LinalgError::SingularMatrix`], если квадратная
+    /// матрица вырождена.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use gf2m::Gf256;
+    /// use gf_linalg::{LinalgError, Matrix};
+    ///
+    /// fn main() -> Result<(), LinalgError> {
+    ///     let matrix = Matrix::try_new(
+    ///         2,
+    ///         2,
+    ///         vec![Gf256::one(), Gf256::one(), Gf256::one(), Gf256::zero()],
+    ///     )?;
+    ///
+    ///     let determinant = matrix.try_determinant()?;
+    ///     assert_eq!(determinant, Gf256::one());
+    ///
+    ///     let inverse = matrix.try_inverse()?;
+    ///     let identity = Matrix::try_new(
+    ///         2,
+    ///         2,
+    ///         vec![Gf256::one(), Gf256::zero(), Gf256::zero(), Gf256::one()],
+    ///     )?;
+    ///     assert_eq!(matrix.try_mul(&inverse)?, identity);
+    ///
+    ///     // Методы принимают &matrix, поэтому исходная матрица остаётся доступной.
+    ///     assert_eq!(matrix.get(0, 0), Some(Gf256::one()));
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn try_inverse(&self) -> Result<Self, LinalgError> {
+        if self.rows != self.cols {
+            return Err(LinalgError::NonSquareMatrix {
+                rows: self.rows,
+                cols: self.cols,
+            });
+        }
+
+        let n = self.rows;
+        let element_count = n
+            .checked_mul(n)
+            .ok_or(LinalgError::InvalidDimensions { rows: n, cols: n })?;
+
+        let mut left = self.data.clone();
+        let mut right = vec![Gf256::zero(); element_count];
+        for index in 0..n {
+            right[index * n + index] = Gf256::one();
+        }
+
+        for pivot_col in 0..n {
+            let Some(pivot_row) = (pivot_col..n).find(|&row| !left[row * n + pivot_col].is_zero())
+            else {
+                return Err(LinalgError::SingularMatrix);
+            };
+
+            if pivot_row != pivot_col {
+                for col in 0..n {
+                    left.swap(pivot_row * n + col, pivot_col * n + col);
+                    right.swap(pivot_row * n + col, pivot_col * n + col);
+                }
+            }
+
+            let pivot_inverse = left[pivot_col * n + pivot_col].inv();
+            for col in 0..n {
+                left[pivot_col * n + col] *= pivot_inverse;
+                right[pivot_col * n + col] *= pivot_inverse;
+            }
+
+            let pivot_offset = pivot_col * n;
+            for row in 0..n {
+                if row == pivot_col {
+                    continue;
+                }
+
+                let row_offset = row * n;
+                let factor = left[row_offset + pivot_col];
+                if factor.is_zero() {
+                    continue;
+                }
+
+                for col in 0..n {
+                    let left_pivot_value = left[pivot_offset + col];
+                    let right_pivot_value = right[pivot_offset + col];
+                    left[row_offset + col] += factor * left_pivot_value;
+                    right[row_offset + col] += factor * right_pivot_value;
+                }
+            }
+        }
+
+        Ok(Self {
+            rows: n,
+            cols: n,
+            data: right,
+        })
+    }
+
     /// Возвращает новую матрицу с переставленными строками и столбцами.
     ///
     /// Элементы копируются в порядке по строкам транспонированной матрицы;
