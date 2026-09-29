@@ -4,5 +4,7 @@
 //! Библиотека для линейной алгебры над конечным полем GF(256).
 
 mod error;
+mod vector;
 
 pub use error::LinalgError;
+pub use vector::Vector;
