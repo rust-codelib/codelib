@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-/// Ошибка при создании матрицы.
+/// Ошибка при создании матрицы или выполнении операции линейной алгебры.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinalgError {
     /// Размеры матрицы недопустимы.
@@ -19,6 +19,18 @@ pub enum LinalgError {
         /// Фактическое число элементов.
         actual: usize,
     },
+    /// Длины складываемых векторов не совпадают.
+    VectorLengthMismatch {
+        /// Длина левого вектора.
+        left: usize,
+        /// Длина правого вектора.
+        right: usize,
+    },
+    /// Запрошенная операция пока не реализована.
+    NotImplemented {
+        /// Название операции, доступное во время всей жизни программы.
+        operation: &'static str,
+    },
 }
 
 impl fmt::Display for LinalgError {
@@ -32,6 +44,15 @@ impl fmt::Display for LinalgError {
                     f,
                     "неверное число элементов матрицы: ожидалось {expected}, получено {actual}"
                 )
+            }
+            Self::VectorLengthMismatch { left, right } => {
+                write!(
+                    f,
+                    "длины векторов не совпадают: слева {left}, справа {right}"
+                )
+            }
+            Self::NotImplemented { operation } => {
+                write!(f, "операция не реализована: {operation}")
             }
         }
     }
