@@ -2,9 +2,10 @@
 //!
 //! Заголовок должен быть ровно `vector` или `matrix` в нижнем регистре.
 //! Размеры — беззнаковые десятичные ASCII-числа; ведущие нули допустимы.
-//! Элементы записываются как `0xNN`: на входе шестнадцатеричные цифры могут
-//! быть строчными или прописными, префикс `0x` остаётся строчным, а вывод
-//! всегда использует строчные цифры. Векторы могут иметь нулевую длину;
+//! Формат токена элемента задаётся [`FieldText`]. Для семейства `gf2m` это
+//! `0x` и фиксированное число шестнадцатеричных ASCII-цифр; цифры на входе
+//! могут быть строчными или прописными, префикс `0x` остаётся строчным, а
+//! вывод использует строчные цифры. Векторы могут иметь нулевую длину;
 //! каждая ось матрицы должна быть в диапазоне `1..=MAX_MATRIX_DIM`.
 //!
 //! Между токенами принимаются только ASCII-разделители: пробел, табуляция,
@@ -68,22 +69,29 @@
 //! ```
 
 use core::fmt;
-use gf2m::Gf256;
 use std::str::FromStr;
 
-use crate::{LinalgError, Matrix, Vector, MAX_MATRIX_DIM};
+use crate::{FieldText, LinalgError, Matrix, Vector, MAX_MATRIX_DIM};
 
-impl fmt::Display for Vector {
+struct ElementDisplay<F: FieldText>(F);
+
+impl<F: FieldText> fmt::Display for ElementDisplay<F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt_element(f)
+    }
+}
+
+impl<F: FieldText> fmt::Display for Vector<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "vector {}", self.len())?;
         for element in self.as_slice() {
-            write!(f, " 0x{:02x}", element.value())?;
+            write!(f, " {}", ElementDisplay(*element))?;
         }
         Ok(())
     }
 }
 
-impl FromStr for Vector {
+impl<F: FieldText> FromStr for Vector<F> {
     type Err = LinalgError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
@@ -110,15 +118,16 @@ impl FromStr for Vector {
 
         let mut elements = Vec::with_capacity(length);
         for (index, token) in ascii_whitespace_tokens(text).skip(2).enumerate() {
-            let value = parse_hex_byte(token).ok_or(LinalgError::InvalidTextElement { index })?;
-            elements.push(Gf256::new(u16::from(value)));
+            let element =
+                F::parse_element(token).ok_or(LinalgError::InvalidTextElement { index })?;
+            elements.push(element);
         }
 
-        Ok(Vector::new(elements))
+        Ok(Vector::<F>::new(elements))
     }
 }
 
-impl fmt::Display for Matrix {
+impl<F: FieldText> fmt::Display for Matrix<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "matrix {} {}", self.rows(), self.cols())?;
         for row in self.as_slice().chunks(self.cols()) {
@@ -127,14 +136,14 @@ impl fmt::Display for Matrix {
                 if col > 0 {
                     write!(f, " ")?;
                 }
-                write!(f, "0x{:02x}", element.value())?;
+                write!(f, "{}", ElementDisplay(*element))?;
             }
         }
         Ok(())
     }
 }
 
-impl FromStr for Matrix {
+impl<F: FieldText> FromStr for Matrix<F> {
     type Err = LinalgError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
@@ -170,11 +179,12 @@ impl FromStr for Matrix {
 
         let mut elements = Vec::with_capacity(expected);
         for (index, token) in ascii_whitespace_tokens(text).skip(3).enumerate() {
-            let value = parse_hex_byte(token).ok_or(LinalgError::InvalidTextElement { index })?;
-            elements.push(Gf256::new(u16::from(value)));
+            let element =
+                F::parse_element(token).ok_or(LinalgError::InvalidTextElement { index })?;
+            elements.push(element);
         }
 
-        Matrix::try_new(rows, cols, elements)
+        Matrix::<F>::try_new(rows, cols, elements)
     }
 }
 
@@ -191,24 +201,4 @@ fn parse_ascii_usize(token: &str, token_index: usize) -> Result<usize, LinalgErr
     token
         .parse::<usize>()
         .map_err(|_| LinalgError::InvalidTextDimension { token_index })
-}
-
-fn parse_hex_byte(token: &str) -> Option<u8> {
-    let bytes = token.as_bytes();
-    if bytes.len() != 4 || bytes[0] != b'0' || bytes[1] != b'x' {
-        return None;
-    }
-
-    let high = hex_nibble(bytes[2])?;
-    let low = hex_nibble(bytes[3])?;
-    Some((high << 4) | low)
-}
-
-fn hex_nibble(byte: u8) -> Option<u8> {
-    match byte {
-        b'0'..=b'9' => Some(byte - b'0'),
-        b'a'..=b'f' => Some(byte - b'a' + 10),
-        b'A'..=b'F' => Some(byte - b'A' + 10),
-        _ => None,
-    }
 }

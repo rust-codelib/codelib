@@ -95,6 +95,33 @@ fn matrix_shape_mismatch_preserves_both_shapes_and_names_the_operation() {
 }
 
 #[test]
+fn matrix_subtraction_shape_mismatch_preserves_shapes_and_has_a_readable_message() {
+    let error = LinalgError::MatrixSubtractionShapeMismatch {
+        left_rows: 2,
+        left_cols: 3,
+        right_rows: 3,
+        right_cols: 2,
+    };
+
+    assert_eq!(
+        error,
+        LinalgError::MatrixSubtractionShapeMismatch {
+            left_rows: 2,
+            left_cols: 3,
+            right_rows: 3,
+            right_cols: 2,
+        }
+    );
+    assert_eq!(
+        error.to_string(),
+        "размеры матриц для вычитания не совпадают: слева 2 × 3, справа 3 × 2"
+    );
+
+    fn assert_error_copy<T: std::error::Error + Copy>() {}
+    assert_error_copy::<LinalgError>();
+}
+
+#[test]
 fn matrix_product_mismatch_preserves_operand_dimensions_and_has_a_readable_message() {
     let error = LinalgError::MatrixProductMismatch {
         left_cols: 3,

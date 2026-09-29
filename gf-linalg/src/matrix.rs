@@ -1,11 +1,11 @@
-//! Матрицы над полем GF(256).
+//! Матрицы над конечным полем.
 
 use gf2m::Gf256;
-use std::ops::{Add, Mul};
+use std::ops::{Add, Mul, Sub};
 
-use crate::{LinalgError, Vector, MAX_MATRIX_DIM};
+use crate::{FieldElement, LinalgError, Vector, MAX_MATRIX_DIM};
 
-/// Прямоугольная матрица элементов GF(256), хранящая значения по строкам.
+/// Прямоугольная матрица элементов поля `F`, хранящая значения по строкам.
 ///
 /// Размер каждой оси находится в диапазоне `1..=MAX_MATRIX_DIM`. Матрица
 /// принимает `Vec` во владение и сохраняет порядок элементов, включая нули.
@@ -14,10 +14,13 @@ use crate::{LinalgError, Vector, MAX_MATRIX_DIM};
 /// разных форм не равны, даже если их плоские данные совпадают.
 ///
 /// Методы операций заимствуют матрицы и возвращают новые значения, не меняя
-/// исходные. Операторы доступны и для принадлежащих значений (`a + b`, `a * b`),
-/// и для ссылок (`&a + &b`, `&a * &b`); варианты со ссылками оставляют операнды
-/// доступными после операции. Результат `+` и `*` имеет тип [`Result`], потому
-/// что размеры могут оказаться несовместимы.
+/// исходные. Операторы доступны и для принадлежащих значений (`a + b`, `a - b`,
+/// `a * b`), и для ссылок (`&a + &b`, `&a - &b`, `&a * &b`); варианты со
+/// ссылками оставляют операнды доступными после операции. Результат этих
+/// операторов имеет тип [`Result`], потому что размеры могут оказаться
+/// несовместимы.
+///
+/// Параметр поля по умолчанию — `gf2m::Gf256`.
 ///
 /// ```
 /// use gf2m::Gf256;
@@ -32,14 +35,54 @@ use crate::{LinalgError, Vector, MAX_MATRIX_DIM};
 /// assert_eq!(MAX_MATRIX_DIM, 4096);
 /// # Ok::<(), gf_linalg::LinalgError>(())
 /// ```
+///
+/// Операции требуют одного и того же типа поля. Следующие выражения не
+/// компилируются, хотя эти операции доступны для матриц и векторов одного поля:
+///
+/// ```compile_fail
+/// use gf2m::Gf256;
+/// use gf_linalg::Matrix;
+/// use gfpm::Gf9;
+///
+/// let binary = Matrix::<Gf256>::try_new(1, 1, vec![Gf256::one()]).unwrap();
+/// let ternary = Matrix::<Gf9>::try_new(1, 1, vec![Gf9::one()]).unwrap();
+/// let _ = &binary + &binary;
+/// let _ = binary.try_add(&ternary);
+/// let _ = &binary + &ternary;
+/// ```
+///
+/// ```compile_fail
+/// use gf2m::Gf256;
+/// use gf_linalg::Matrix;
+/// use gfpm::Gf9;
+///
+/// let binary = Matrix::<Gf256>::try_new(1, 1, vec![Gf256::one()]).unwrap();
+/// let ternary = Matrix::<Gf9>::try_new(1, 1, vec![Gf9::one()]).unwrap();
+/// let _ = &binary - &binary;
+/// let _ = binary.try_sub(&ternary);
+/// let _ = &binary - &ternary;
+/// ```
+///
+/// ```compile_fail
+/// use gf2m::Gf256;
+/// use gf_linalg::{Matrix, Vector};
+/// use gfpm::Gf9;
+///
+/// let binary = Matrix::<Gf256>::try_new(1, 1, vec![Gf256::one()]).unwrap();
+/// let binary_vector = Vector::<Gf256>::new(vec![Gf256::one()]);
+/// let ternary = Vector::<Gf9>::new(vec![Gf9::one()]);
+/// let _ = &binary * &binary_vector;
+/// let _ = binary.try_mul_vector(&ternary);
+/// let _ = &binary * &ternary;
+/// ```
 #[derive(Debug, PartialEq, Eq)]
-pub struct Matrix {
+pub struct Matrix<F: FieldElement = Gf256> {
     rows: usize,
     cols: usize,
-    data: Vec<Gf256>,
+    data: Vec<F>,
 }
 
-impl Matrix {
+impl<F: FieldElement> Matrix<F> {
     /// Создаёт матрицу и принимает `Vec` во владение без копирования элементов.
     ///
     /// Число строк и столбцов должно быть в диапазоне
@@ -51,7 +94,7 @@ impl Matrix {
     /// выходит за допустимый диапазон, и [`LinalgError::ElementCountMismatch`],
     /// если число элементов не совпадает с ожидаемым. Размеры проверяются до
     /// длины `data`.
-    pub fn try_new(rows: usize, cols: usize, data: Vec<Gf256>) -> Result<Self, LinalgError> {
+    pub fn try_new(rows: usize, cols: usize, data: Vec<F>) -> Result<Self, LinalgError> {
         if !(1..=MAX_MATRIX_DIM).contains(&rows) || !(1..=MAX_MATRIX_DIM).contains(&cols) {
             return Err(LinalgError::InvalidDimensions { rows, cols });
         }
@@ -68,8 +111,10 @@ impl Matrix {
 
         Ok(Self { rows, cols, data })
     }
+}
 
-    /// Складывает матрицу с матрицей той же формы по правилам GF(256).
+impl<F: FieldElement> Matrix<F> {
+    /// Складывает матрицу с матрицей той же формы по правилам поля `F`.
     ///
     /// При несовпадении числа строк или столбцов возвращает
     /// [`LinalgError::MatrixShapeMismatch`] с формами обоих операндов. При
@@ -81,7 +126,7 @@ impl Matrix {
     /// Возвращает [`LinalgError::MatrixShapeMismatch`], если строки или столбцы
     /// операндов различаются. Сравниваются обе оси, даже когда общее число
     /// элементов у матриц одинаково.
-    pub fn try_add(&self, rhs: &Self) -> Result<Self, LinalgError> {
+    pub fn try_add(&self, rhs: &Matrix<F>) -> Result<Matrix<F>, LinalgError> {
         if self.rows != rhs.rows || self.cols != rhs.cols {
             return Err(LinalgError::MatrixShapeMismatch {
                 left_rows: self.rows,
@@ -105,7 +150,43 @@ impl Matrix {
         })
     }
 
-    /// Умножает матрицы по правилам GF(256).
+    /// Вычитает матрицу той же формы по правилам поля `F`.
+    ///
+    /// При несовпадении числа строк или столбцов возвращает
+    /// [`LinalgError::MatrixSubtractionShapeMismatch`] с формами обоих
+    /// операндов. При успехе создаёт матрицу той же формы, вычисляя разность
+    /// элементов по позициям; исходные матрицы не изменяются.
+    ///
+    /// # Ошибка
+    ///
+    /// Возвращает [`LinalgError::MatrixSubtractionShapeMismatch`], если строки
+    /// или столбцы операндов различаются. Проверяются обе оси, даже когда
+    /// общее число элементов у матриц одинаково.
+    pub fn try_sub(&self, rhs: &Matrix<F>) -> Result<Matrix<F>, LinalgError> {
+        if self.rows != rhs.rows || self.cols != rhs.cols {
+            return Err(LinalgError::MatrixSubtractionShapeMismatch {
+                left_rows: self.rows,
+                left_cols: self.cols,
+                right_rows: rhs.rows,
+                right_cols: rhs.cols,
+            });
+        }
+
+        let data = self
+            .data
+            .iter()
+            .zip(&rhs.data)
+            .map(|(&left, &right)| left - right)
+            .collect();
+
+        Ok(Matrix::<F> {
+            rows: self.rows,
+            cols: self.cols,
+            data,
+        })
+    }
+
+    /// Умножает матрицы по правилам поля `F`.
     ///
     /// Число столбцов `self` должно совпадать с числом строк `rhs`; иначе
     /// возвращается [`LinalgError::MatrixProductMismatch`] с размерами в
@@ -117,7 +198,7 @@ impl Matrix {
     /// Возвращает [`LinalgError::MatrixProductMismatch`], когда внутренние
     /// размеры не совпадают. Если расчёт числа элементов результата переполняет
     /// `usize`, возвращается [`LinalgError::InvalidDimensions`].
-    pub fn try_mul(&self, rhs: &Self) -> Result<Self, LinalgError> {
+    pub fn try_mul(&self, rhs: &Matrix<F>) -> Result<Matrix<F>, LinalgError> {
         if self.cols != rhs.rows {
             return Err(LinalgError::MatrixProductMismatch {
                 left_cols: self.cols,
@@ -136,11 +217,11 @@ impl Matrix {
 
         for row in 0..self.rows {
             for col in 0..rhs.cols {
-                let mut sum = Gf256::zero();
+                let mut sum = F::zero();
                 for inner in 0..self.cols {
                     let left = self.data[row * self.cols + inner];
                     let right = rhs.data[inner * rhs.cols + col];
-                    sum += left * right;
+                    sum = sum + left * right;
                 }
                 data.push(sum);
             }
@@ -153,7 +234,7 @@ impl Matrix {
         })
     }
 
-    /// Умножает матрицу на вектор по правилам GF(256).
+    /// Умножает матрицу на вектор по правилам поля `F`.
     ///
     /// Длина `rhs` должна совпадать с числом столбцов матрицы; при
     /// несовпадении возвращается [`LinalgError::MatrixVectorLengthMismatch`]
@@ -164,7 +245,7 @@ impl Matrix {
     ///
     /// Возвращает [`LinalgError::MatrixVectorLengthMismatch`], если длина
     /// вектора не совпадает с числом столбцов матрицы.
-    pub fn try_mul_vector(&self, rhs: &Vector) -> Result<Vector, LinalgError> {
+    pub fn try_mul_vector(&self, rhs: &Vector<F>) -> Result<Vector<F>, LinalgError> {
         if self.cols != rhs.len() {
             return Err(LinalgError::MatrixVectorLengthMismatch {
                 matrix_cols: self.cols,
@@ -174,22 +255,24 @@ impl Matrix {
 
         let mut data = Vec::with_capacity(self.rows);
         for row in 0..self.rows {
-            let mut sum = Gf256::zero();
+            let mut sum = F::zero();
             for col in 0..self.cols {
                 let matrix_value = self.data[row * self.cols + col];
                 let vector_value = rhs.as_slice()[col];
-                sum += matrix_value * vector_value;
+                sum = sum + matrix_value * vector_value;
             }
             data.push(sum);
         }
 
-        Ok(Vector::new(data))
+        Ok(Vector::<F>::new(data))
     }
+}
 
-    /// Вычисляет определитель квадратной матрицы методом Гаусса над GF(256).
+impl<F: FieldElement> Matrix<F> {
+    /// Вычисляет определитель квадратной матрицы методом Гаусса над полем `F`.
     ///
     /// Метод определён только для квадратных матриц. Для квадратной вырожденной
-    /// матрицы результатом будет `Ok(Gf256::zero())`. Прямоугольная матрица
+    /// матрицы результатом будет `Ok(F::zero())`. Прямоугольная матрица
     /// приводит к [`LinalgError::NonSquareMatrix`] с её фактическими размерами.
     ///
     /// Метод заимствует исходную матрицу и не меняет её.
@@ -198,7 +281,7 @@ impl Matrix {
     ///
     /// Возвращает [`LinalgError::NonSquareMatrix`], если число строк не равно
     /// числу столбцов.
-    pub fn try_determinant(&self) -> Result<Gf256, LinalgError> {
+    pub fn try_determinant(&self) -> Result<F, LinalgError> {
         if self.rows != self.cols {
             return Err(LinalgError::NonSquareMatrix {
                 rows: self.rows,
@@ -208,22 +291,23 @@ impl Matrix {
 
         let n = self.rows;
         let mut work = self.data.clone();
-        let mut determinant = Gf256::one();
+        let mut determinant = F::one();
 
         for pivot_col in 0..n {
             let Some(pivot_row) = (pivot_col..n).find(|&row| !work[row * n + pivot_col].is_zero())
             else {
-                return Ok(Gf256::zero());
+                return Ok(F::zero());
             };
 
             if pivot_row != pivot_col {
+                determinant = -determinant;
                 for col in 0..n {
                     work.swap(pivot_row * n + col, pivot_col * n + col);
                 }
             }
 
             let pivot = work[pivot_col * n + pivot_col];
-            determinant *= pivot;
+            determinant = determinant * pivot;
 
             // Pivot гарантированно ненулевой после поиска выше.
             let pivot_inverse = pivot.inv();
@@ -237,17 +321,19 @@ impl Matrix {
                 let pivot_offset = pivot_col * n;
                 for col in pivot_col + 1..n {
                     let pivot_value = work[pivot_offset + col];
-                    work[row_offset + col] += factor * pivot_value;
+                    work[row_offset + col] = work[row_offset + col] - factor * pivot_value;
                 }
-                work[row_offset + pivot_col] = Gf256::zero();
+                work[row_offset + pivot_col] = F::zero();
             }
         }
 
         Ok(determinant)
     }
+}
 
+impl<F: FieldElement> Matrix<F> {
     /// Возвращает обратную матрицу квадратной матрицы методом Гаусса–Жордана
-    /// над GF(256).
+    /// над полем `F`.
     ///
     /// Метод определён только для квадратных матриц. Если квадратная матрица
     /// вырождена, обратной матрицы нет и возвращается
@@ -304,9 +390,9 @@ impl Matrix {
             .ok_or(LinalgError::InvalidDimensions { rows: n, cols: n })?;
 
         let mut left = self.data.clone();
-        let mut right = vec![Gf256::zero(); element_count];
+        let mut right = vec![F::zero(); element_count];
         for index in 0..n {
-            right[index * n + index] = Gf256::one();
+            right[index * n + index] = F::one();
         }
 
         for pivot_col in 0..n {
@@ -324,8 +410,8 @@ impl Matrix {
 
             let pivot_inverse = left[pivot_col * n + pivot_col].inv();
             for col in 0..n {
-                left[pivot_col * n + col] *= pivot_inverse;
-                right[pivot_col * n + col] *= pivot_inverse;
+                left[pivot_col * n + col] = left[pivot_col * n + col] * pivot_inverse;
+                right[pivot_col * n + col] = right[pivot_col * n + col] * pivot_inverse;
             }
 
             let pivot_offset = pivot_col * n;
@@ -343,8 +429,8 @@ impl Matrix {
                 for col in 0..n {
                     let left_pivot_value = left[pivot_offset + col];
                     let right_pivot_value = right[pivot_offset + col];
-                    left[row_offset + col] += factor * left_pivot_value;
-                    right[row_offset + col] += factor * right_pivot_value;
+                    left[row_offset + col] = left[row_offset + col] - factor * left_pivot_value;
+                    right[row_offset + col] = right[row_offset + col] - factor * right_pivot_value;
                 }
             }
         }
@@ -355,7 +441,9 @@ impl Matrix {
             data: right,
         })
     }
+}
 
+impl<F: FieldElement> Matrix<F> {
     /// Возвращает новую матрицу с переставленными строками и столбцами.
     ///
     /// Элементы копируются в порядке по строкам транспонированной матрицы;
@@ -391,7 +479,7 @@ impl Matrix {
     ///
     /// Срез не передаёт владение данными и не позволяет изменить длину
     /// внутреннего `Vec`.
-    pub fn as_slice(&self) -> &[Gf256] {
+    pub fn as_slice(&self) -> &[F] {
         &self.data
     }
 
@@ -400,7 +488,7 @@ impl Matrix {
     /// `Some(срез)` содержит ровно `cols()` элементов. `None` возвращается,
     /// если индекс строки находится за границами матрицы, в том числе если он
     /// равен `usize::MAX`; паники не происходит.
-    pub fn row(&self, row: usize) -> Option<&[Gf256]> {
+    pub fn row(&self, row: usize) -> Option<&[F]> {
         if row >= self.rows {
             return None;
         }
@@ -415,7 +503,7 @@ impl Matrix {
     /// и `None` в противном случае. Обе координаты проверяются до вычисления
     /// плоского индекса, поэтому выход за пределы столбцов не переходит в
     /// следующую строку. Индексы `usize::MAX` также безопасно дают `None`.
-    pub fn get(&self, row: usize, col: usize) -> Option<Gf256> {
+    pub fn get(&self, row: usize, col: usize) -> Option<F> {
         if row >= self.rows || col >= self.cols {
             return None;
         }
@@ -428,7 +516,7 @@ impl Matrix {
     /// Через возвращённую ссылку можно заменить значение, не меняя длину
     /// матрицы. `None` возвращается без паники, если любая координата находится
     /// за границами, включая значение `usize::MAX`.
-    pub fn get_mut(&mut self, row: usize, col: usize) -> Option<&mut Gf256> {
+    pub fn get_mut(&mut self, row: usize, col: usize) -> Option<&mut F> {
         if row >= self.rows || col >= self.cols {
             return None;
         }
@@ -439,12 +527,10 @@ impl Matrix {
 
 /// Сложение двух матриц, переданных оператору во владение.
 ///
-/// Оба значения перемещаются в оператор, поэтому после выражения их нельзя
-/// использовать. Результат имеет тип `Result<Matrix, LinalgError>` и содержит
-/// сумму той же формы либо [`LinalgError::MatrixShapeMismatch`]. Чтобы сохранить
-/// операнды доступными, используйте вариант `&Matrix + &Matrix`.
-impl Add for Matrix {
-    type Output = Result<Matrix, LinalgError>;
+/// Оба значения перемещаются в оператор. Результат содержит сумму той же
+/// формы либо [`LinalgError::MatrixShapeMismatch`].
+impl<F: FieldElement> Add for Matrix<F> {
+    type Output = Result<Matrix<F>, LinalgError>;
 
     fn add(self, rhs: Self) -> Self::Output {
         self.try_add(&rhs)
@@ -453,26 +539,46 @@ impl Add for Matrix {
 
 /// Сложение заимствованных матриц без передачи владения операндами.
 ///
-/// Выражение `&a + &b` возвращает `Result<Matrix, LinalgError>`; обе исходные
-/// матрицы остаются доступными. Несовпадающие формы дают
-/// [`LinalgError::MatrixShapeMismatch`].
-impl Add<&Matrix> for &Matrix {
-    type Output = Result<Matrix, LinalgError>;
+/// Выражение `&a + &b` оставляет обе исходные матрицы доступными. Несовпадающие
+/// формы дают [`LinalgError::MatrixShapeMismatch`].
+impl<F: FieldElement> Add<&Matrix<F>> for &Matrix<F> {
+    type Output = Result<Matrix<F>, LinalgError>;
 
-    fn add(self, rhs: &Matrix) -> Self::Output {
+    fn add(self, rhs: &Matrix<F>) -> Self::Output {
         self.try_add(rhs)
+    }
+}
+
+/// Вычитание двух матриц, переданных оператору во владение.
+///
+/// Оба значения перемещаются в оператор. Результат содержит разность той же
+/// формы либо [`LinalgError::MatrixSubtractionShapeMismatch`].
+impl<F: FieldElement> Sub for Matrix<F> {
+    type Output = Result<Matrix<F>, LinalgError>;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.try_sub(&rhs)
+    }
+}
+
+/// Вычитание заимствованных матриц без передачи владения операндами.
+///
+/// Выражение `&a - &b` оставляет обе исходные матрицы доступными. Несовпадающие
+/// формы дают [`LinalgError::MatrixSubtractionShapeMismatch`].
+impl<F: FieldElement> Sub<&Matrix<F>> for &Matrix<F> {
+    type Output = Result<Matrix<F>, LinalgError>;
+
+    fn sub(self, rhs: &Matrix<F>) -> Self::Output {
+        self.try_sub(rhs)
     }
 }
 
 /// Умножение двух матриц, переданных оператору во владение.
 ///
-/// Оба значения перемещаются в оператор, поэтому после выражения их нельзя
-/// использовать. Результат имеет тип `Result<Matrix, LinalgError>` и содержит
-/// матрицу с числом строк левого операнда и числом столбцов правого либо
-/// ошибку несовместимых внутренних размеров. Чтобы сохранить операнды
-/// доступными, используйте вариант `&Matrix * &Matrix`.
-impl Mul for Matrix {
-    type Output = Result<Matrix, LinalgError>;
+/// Результат имеет число строк левого операнда и число столбцов правого либо
+/// ошибку несовместимых внутренних размеров.
+impl<F: FieldElement> Mul for Matrix<F> {
+    type Output = Result<Matrix<F>, LinalgError>;
 
     fn mul(self, rhs: Self) -> Self::Output {
         self.try_mul(&rhs)
@@ -481,41 +587,36 @@ impl Mul for Matrix {
 
 /// Умножение заимствованных матриц без передачи владения операндами.
 ///
-/// Выражение `&a * &b` возвращает `Result<Matrix, LinalgError>`; обе исходные
-/// матрицы остаются доступными. Число столбцов `a` должно совпасть с числом
-/// строк `b`.
-impl Mul<&Matrix> for &Matrix {
-    type Output = Result<Matrix, LinalgError>;
+/// Выражение `&a * &b` оставляет исходные матрицы доступными. Число столбцов
+/// `a` должно совпасть с числом строк `b`.
+impl<F: FieldElement> Mul<&Matrix<F>> for &Matrix<F> {
+    type Output = Result<Matrix<F>, LinalgError>;
 
-    fn mul(self, rhs: &Matrix) -> Self::Output {
+    fn mul(self, rhs: &Matrix<F>) -> Self::Output {
         self.try_mul(rhs)
     }
 }
 
 /// Умножение матрицы и вектора, переданных оператору во владение.
 ///
-/// Матрица и вектор перемещаются в оператор, поэтому после выражения их нельзя
-/// использовать. Результат имеет тип `Result<Vector, LinalgError>` и содержит
-/// вектор длины `matrix.rows()` либо ошибку несовпадения длины вектора с числом
-/// столбцов матрицы. Чтобы сохранить операнды доступными, используйте
-/// вариант `&Matrix * &Vector`.
-impl Mul<Vector> for Matrix {
-    type Output = Result<Vector, LinalgError>;
+/// Результат содержит вектор длины `matrix.rows()` либо ошибку несовпадения
+/// длины вектора с числом столбцов матрицы.
+impl<F: FieldElement> Mul<Vector<F>> for Matrix<F> {
+    type Output = Result<Vector<F>, LinalgError>;
 
-    fn mul(self, rhs: Vector) -> Self::Output {
+    fn mul(self, rhs: Vector<F>) -> Self::Output {
         self.try_mul_vector(&rhs)
     }
 }
 
 /// Умножение заимствованных матрицы и вектора без передачи владения.
 ///
-/// Выражение `&matrix * &vector` возвращает `Result<Vector, LinalgError>`;
-/// матрица и вектор остаются доступными. Длина вектора должна совпасть с числом
-/// столбцов матрицы, а длина результата равна числу её строк.
-impl Mul<&Vector> for &Matrix {
-    type Output = Result<Vector, LinalgError>;
+/// Выражение `&matrix * &vector` оставляет исходные значения доступными. Длина
+/// вектора должна совпасть с числом столбцов матрицы.
+impl<F: FieldElement> Mul<&Vector<F>> for &Matrix<F> {
+    type Output = Result<Vector<F>, LinalgError>;
 
-    fn mul(self, rhs: &Vector) -> Self::Output {
+    fn mul(self, rhs: &Vector<F>) -> Self::Output {
         self.try_mul_vector(rhs)
     }
 }

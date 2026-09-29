@@ -14,7 +14,7 @@ fn constructor_preserves_order_length_and_trailing_zeros() {
 
 #[test]
 fn empty_vector_has_no_readable_or_mutable_elements() {
-    let mut vector = Vector::new(Vec::new());
+    let mut vector = Vector::<Gf256>::new(Vec::new());
 
     assert_eq!(vector.len(), 0);
     assert!(vector.is_empty());
@@ -108,8 +108,8 @@ fn try_add_computes_field_sum_and_preserves_length_and_trailing_zeros() {
 
 #[test]
 fn try_add_accepts_two_empty_vectors() {
-    let left = Vector::new(Vec::new());
-    let right = Vector::new(Vec::new());
+    let left = Vector::<Gf256>::new(Vec::new());
+    let right = Vector::<Gf256>::new(Vec::new());
 
     let sum = left.try_add(&right).unwrap();
 
@@ -118,7 +118,7 @@ fn try_add_accepts_two_empty_vectors() {
 
 #[test]
 fn try_add_reports_both_length_orders_without_changing_operands() {
-    let empty = Vector::new(Vec::new());
+    let empty = Vector::<Gf256>::new(Vec::new());
     let one = Vector::new(vec![Gf256::new(1)]);
     let two = Vector::new(vec![Gf256::new(1), Gf256::new(2)]);
     let three = Vector::new(vec![Gf256::new(1), Gf256::new(2), Gf256::new(3)]);
@@ -226,8 +226,8 @@ fn scaling_has_no_matrix_dimension_limit() {
 
 #[test]
 fn vector_equality_compares_exact_length_and_all_elements() {
-    let empty = Vector::new(Vec::new());
-    let another_empty = Vector::new(Vec::new());
+    let empty = Vector::<Gf256>::new(Vec::new());
+    let another_empty = Vector::<Gf256>::new(Vec::new());
     let with_trailing_zero = Vector::new(vec![Gf256::new(7), Gf256::zero()]);
     let same_values_and_length = Vector::new(vec![Gf256::new(7), Gf256::zero()]);
     let shorter = Vector::new(vec![Gf256::new(7)]);
@@ -254,7 +254,7 @@ fn try_dot_returns_not_implemented_for_equal_different_and_empty_vectors() {
     let equal_left = Vector::new(vec![Gf256::new(2), Gf256::new(3)]);
     let equal_right = Vector::new(vec![Gf256::new(4), Gf256::new(5)]);
     let different = Vector::new(vec![Gf256::new(6)]);
-    let empty = Vector::new(Vec::new());
+    let empty = Vector::<Gf256>::new(Vec::new());
     let expected = LinalgError::NotImplemented {
         operation: "скалярное произведение векторов",
     };

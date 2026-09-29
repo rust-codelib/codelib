@@ -57,7 +57,7 @@ fn rejects_zero_oversized_and_usize_maximum_dimensions_without_panicking() {
         (1, usize::MAX),
         (usize::MAX, usize::MAX),
     ] {
-        let result = Matrix::try_new(rows, cols, Vec::new());
+        let result = Matrix::try_new(rows, cols, Vec::<Gf256>::new());
         assert!(matches!(
             result,
             Err(LinalgError::InvalidDimensions {

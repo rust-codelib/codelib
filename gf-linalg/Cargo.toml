@@ -5,10 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Линейная алгебра над конечным полем GF(256)"
+description = "Линейная алгебра над статическими конечными полями"
 
 [dependencies]
 gf2m = { path = "../gf2m", version = "1.0.0" }
+gfpm = { path = "../gfpm", version = "1.0.0" }
 
 [lib]
 name = "gf_linalg"
