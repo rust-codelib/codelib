@@ -2,10 +2,13 @@
 #![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
 
+mod coefficients;
 mod error;
 mod matrix;
+mod text;
 mod vector;
 
+pub use coefficients::MAX_POLYNOMIAL_BYTES;
 pub use error::LinalgError;
 pub use matrix::Matrix;
 pub use vector::Vector;

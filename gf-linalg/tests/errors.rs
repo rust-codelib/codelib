@@ -154,6 +154,92 @@ fn singular_matrix_has_a_readable_message() {
 }
 
 #[test]
+fn text_errors_preserve_context_and_have_readable_messages() {
+    assert_eq!(
+        LinalgError::InvalidTextHeader { expected: "vector" }.to_string(),
+        "неверный заголовок текстового формата: ожидалось `vector`"
+    );
+    assert_eq!(
+        LinalgError::InvalidTextDimension { token_index: 1 }.to_string(),
+        "неверный размер в токене 1"
+    );
+    assert_eq!(
+        LinalgError::TextElementCountMismatch {
+            expected: 3,
+            actual: 2,
+        }
+        .to_string(),
+        "неверное число элементов текста: ожидалось 3, получено 2"
+    );
+    assert_eq!(
+        LinalgError::InvalidTextElement { index: 4 }.to_string(),
+        "неверный текстовый элемент с индексом 4"
+    );
+}
+
+#[test]
+fn linalg_error_remains_copy_after_adding_text_errors() {
+    fn assert_copy<T: Copy>() {}
+    assert_copy::<LinalgError>();
+}
+
+#[test]
+fn polynomial_coefficient_limit_error_preserves_context_and_has_a_readable_message() {
+    let vector_error = LinalgError::PolynomialCoefficientLimitExceeded {
+        row: None,
+        coefficients: 65_537,
+        max_coefficients: 65_536,
+    };
+    assert_eq!(
+        vector_error.to_string(),
+        "превышен предел коэффициентов многочлена вектора: 65537 > 65536"
+    );
+
+    let row_error = LinalgError::PolynomialCoefficientLimitExceeded {
+        row: Some(0),
+        coefficients: 65_537,
+        max_coefficients: 65_536,
+    };
+    assert_eq!(
+        row_error,
+        LinalgError::PolynomialCoefficientLimitExceeded {
+            row: Some(0),
+            coefficients: 65_537,
+            max_coefficients: 65_536,
+        }
+    );
+    assert_eq!(
+        row_error.to_string(),
+        "превышен предел коэффициентов многочлена в строке матрицы с индексом 0: 65537 > 65536"
+    );
+}
+
+#[test]
+fn polynomial_row_length_mismatch_preserves_row_and_widths() {
+    let error = LinalgError::PolynomialRowLengthMismatch {
+        row: 2,
+        expected: 5,
+        actual: 3,
+    };
+
+    assert_eq!(
+        error,
+        LinalgError::PolynomialRowLengthMismatch {
+            row: 2,
+            expected: 5,
+            actual: 3,
+        }
+    );
+    assert_eq!(
+        error.to_string(),
+        "длина коэффициентов строки матрицы с индексом 2 не совпадает: ожидалось 5, получено 3"
+    );
+
+    fn assert_copy<T: Copy>() {}
+    assert_copy::<LinalgError>();
+}
+
+#[test]
 fn matrix_addition_rejects_each_shape_mismatch_with_ordered_dimensions() {
     for (left_rows, left_cols, right_rows, right_cols) in [
         (2, 3, 1, 3), // строки отличаются
