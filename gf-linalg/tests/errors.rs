@@ -1,4 +1,5 @@
-use gf_linalg::LinalgError;
+use gf2m::Gf256;
+use gf_linalg::{LinalgError, Matrix};
 
 #[test]
 fn invalid_dimensions_preserve_rows_and_cols_and_have_a_readable_message() {
@@ -67,4 +68,105 @@ fn linalg_error_implements_standard_error_and_equality_traits() {
 
     assert_error::<LinalgError>();
     assert_equality::<LinalgError>();
+}
+
+#[test]
+fn matrix_shape_mismatch_preserves_both_shapes_and_names_the_operation() {
+    let error = LinalgError::MatrixShapeMismatch {
+        left_rows: 2,
+        left_cols: 3,
+        right_rows: 1,
+        right_cols: 2,
+    };
+
+    assert_eq!(
+        error,
+        LinalgError::MatrixShapeMismatch {
+            left_rows: 2,
+            left_cols: 3,
+            right_rows: 1,
+            right_cols: 2,
+        }
+    );
+    assert_eq!(
+        error.to_string(),
+        "размеры матриц для сложения не совпадают: слева 2 × 3, справа 1 × 2"
+    );
+}
+
+#[test]
+fn matrix_product_mismatch_preserves_operand_dimensions_and_has_a_readable_message() {
+    let error = LinalgError::MatrixProductMismatch {
+        left_cols: 3,
+        right_rows: 4,
+    };
+
+    assert_eq!(
+        error,
+        LinalgError::MatrixProductMismatch {
+            left_cols: 3,
+            right_rows: 4,
+        }
+    );
+    assert_eq!(
+        error.to_string(),
+        "размеры матриц для умножения не совпадают: число столбцов слева 3, число строк справа 4"
+    );
+}
+
+#[test]
+fn matrix_vector_length_mismatch_preserves_both_lengths_and_names_the_operation() {
+    let error = LinalgError::MatrixVectorLengthMismatch {
+        matrix_cols: 3,
+        vector_len: 2,
+    };
+
+    assert_eq!(
+        error,
+        LinalgError::MatrixVectorLengthMismatch {
+            matrix_cols: 3,
+            vector_len: 2,
+        }
+    );
+    assert_eq!(
+        error.to_string(),
+        "умножение матрицы на вектор невозможно: число столбцов матрицы 3, длина вектора 2"
+    );
+}
+
+#[test]
+fn matrix_addition_rejects_each_shape_mismatch_with_ordered_dimensions() {
+    for (left_rows, left_cols, right_rows, right_cols) in [
+        (2, 3, 1, 3), // строки отличаются
+        (2, 3, 2, 2), // столбцы отличаются
+        (2, 3, 1, 2), // отличаются обе оси
+        (2, 3, 3, 2), // число элементов одинаковое, форма различается
+    ] {
+        let expected = LinalgError::MatrixShapeMismatch {
+            left_rows,
+            left_cols,
+            right_rows,
+            right_cols,
+        };
+
+        let left = zero_matrix(left_rows, left_cols);
+        let right = zero_matrix(right_rows, right_cols);
+        assert_eq!(left.try_add(&right).unwrap_err(), expected);
+
+        let left = zero_matrix(left_rows, left_cols);
+        let right = zero_matrix(right_rows, right_cols);
+        assert_eq!((&left + &right).unwrap_err(), expected);
+        assert_eq!(left.rows(), left_rows);
+        assert_eq!(left.cols(), left_cols);
+        assert_eq!(right.rows(), right_rows);
+        assert_eq!(right.cols(), right_cols);
+
+        let left = zero_matrix(left_rows, left_cols);
+        let right = zero_matrix(right_rows, right_cols);
+        assert_eq!((left + right).unwrap_err(), expected);
+    }
+}
+
+fn zero_matrix(rows: usize, cols: usize) -> Matrix {
+    Matrix::try_new(rows, cols, vec![Gf256::zero(); rows * cols]).unwrap()
 }
