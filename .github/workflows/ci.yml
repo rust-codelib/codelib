@@ -57,7 +57,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: thumbv7em-none-eabihf
-      - run: cargo build --release --target thumbv7em-none-eabihf --workspace --lib
+      - run: cargo build --release --target thumbv7em-none-eabihf -p gf2m -p gfpm -p rs-codes --lib
 
   msrv:
     runs-on: ubuntu-latest
