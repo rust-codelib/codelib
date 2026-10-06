@@ -49,6 +49,11 @@ pub enum LdpcError {
     },
     /// Размер внутреннего хранилища не представим типом `usize`.
     SizeOverflow,
+    /// Операция плотной линейной алгебры завершилась ошибкой.
+    LinearAlgebra {
+        /// Исходная ошибка крейта `gf-linalg`.
+        source: gf_linalg::LinalgError,
+    },
 }
 
 impl fmt::Display for LdpcError {
@@ -79,8 +84,22 @@ impl fmt::Display for LdpcError {
                 "длина слова {actual} не совпадает с ожидаемой длиной {expected}"
             ),
             Self::SizeOverflow => write!(f, "переполнение размера внутреннего хранилища"),
+            Self::LinearAlgebra { source } => write!(f, "ошибка линейной алгебры: {source}"),
         }
     }
 }
 
-impl std::error::Error for LdpcError {}
+impl From<gf_linalg::LinalgError> for LdpcError {
+    fn from(source: gf_linalg::LinalgError) -> Self {
+        Self::LinearAlgebra { source }
+    }
+}
+
+impl std::error::Error for LdpcError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::LinearAlgebra { source } => Some(source),
+            _ => None,
+        }
+    }
+}
