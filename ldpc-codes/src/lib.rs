@@ -3,6 +3,7 @@
 #![doc = include_str!("../README.md")]
 
 mod bit;
+mod configurator;
 mod conversion;
 mod decode_input;
 mod decoder;
@@ -14,6 +15,7 @@ mod parity_check;
 mod spa;
 
 pub use bit::Bit;
+pub use configurator::{ConfiguredLdpc, LdpcConfigurator};
 pub use conversion::{bits_to_vector, vector_to_bits, Gf2};
 pub use decode_input::DecodeInput;
 pub use decoder::{DecodeEvent, DecodeObserver, DecodeResult, DecodeStatus, Decoder};

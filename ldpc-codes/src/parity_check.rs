@@ -22,7 +22,7 @@ use crate::{Bit, LdpcError};
 /// assert_eq!(checks.check_bits(0), Some(&[0, 2][..]));
 /// # Ok::<(), ldpc_codes::LdpcError>(())
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParityCheckMatrix {
     check_bits: Vec<Vec<usize>>,
     bit_checks: Vec<Vec<usize>>,
