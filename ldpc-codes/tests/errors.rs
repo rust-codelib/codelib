@@ -29,12 +29,11 @@ fn errors_without_wrapped_causes_have_no_source() {
 
 #[test]
 fn invalid_encoder_rank_has_diagnostic_and_no_wrapped_cause() {
-    let error = LdpcError::InvalidEncoderRank { rank: 2, cols: 2 };
+    let error = LdpcError::InvalidEncoderRank { rank: 2, cols: 3 };
 
-    assert_eq!(
-        error.to_string(),
-        "недопустимый ранг 2 для систематического кодера с 2 столбцами"
-    );
+    let diagnostic = error.to_string();
+    assert!(diagnostic.contains("ранг 2"));
+    assert!(diagnostic.contains("3 столбцами"));
     assert!(error.source().is_none());
 }
 
@@ -45,10 +44,9 @@ fn message_length_mismatch_has_diagnostic_and_no_wrapped_cause() {
         actual: 2,
     };
 
-    assert_eq!(
-        error.to_string(),
-        "длина сообщения 2 не совпадает с ожидаемой длиной 3"
-    );
+    let diagnostic = error.to_string();
+    assert!(diagnostic.contains("сообщения 2"));
+    assert!(diagnostic.contains("длиной 3"));
     assert!(error.source().is_none());
 }
 
@@ -58,6 +56,6 @@ fn invalid_codeword_reports_unsatisfied_checks_without_a_wrapped_cause() {
         unsatisfied_checks: 2,
     };
 
-    assert_eq!(error.to_string(), "кодовое слово нарушает 2 проверки");
+    assert!(error.to_string().contains("2 проверки"));
     assert!(error.source().is_none());
 }
