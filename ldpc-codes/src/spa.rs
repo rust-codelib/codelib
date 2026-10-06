@@ -1,8 +1,7 @@
 //! Разреженный граф и рабочие массивы одного блока для SPA.
 //!
 //! Номер ребра общий для списка соответствующей проверки и списка
-//! соответствующего бита. Модуль пока подключён только в тестах, пока ядро
-//! шага SPA не будет завершено.
+//! соответствующего бита.
 
 use core::mem::size_of;
 
@@ -14,7 +13,6 @@ struct SparseGraph {
     check_edges: Vec<Vec<usize>>,
     bit_edges: Vec<Vec<usize>>,
     edge_bits: Vec<usize>,
-    max_check_degree: usize,
 }
 
 impl SparseGraph {
@@ -55,7 +53,6 @@ impl SparseGraph {
             check_edges,
             bit_edges,
             edge_bits,
-            max_check_degree: sizes.max_check_degree,
         }
     }
 }
@@ -153,6 +150,42 @@ impl SpaState {
         }
     }
 
+    fn update_bit_messages(&mut self, config: DecoderConfig) {
+        let llr_limit = config.llr_limit();
+        for (bit, edges) in self.graph.bit_edges.iter().enumerate() {
+            if edges.is_empty() {
+                self.posterior[bit] = self.channel[bit];
+                self.word[bit] = hard_decision(self.channel[bit]);
+                continue;
+            }
+
+            let incoming = edges.iter().map(|&edge| self.r[edge]).sum::<f64>();
+            let total = self.channel[bit] + incoming;
+
+            self.posterior[bit] = total.clamp(-llr_limit, llr_limit);
+            self.word[bit] = hard_decision(self.posterior[bit]);
+            if edges.len() == 1 {
+                self.q[edges[0]] = self.channel[bit].clamp(-llr_limit, llr_limit);
+            } else {
+                for &edge in edges {
+                    self.q[edge] = (total - self.r[edge]).clamp(-llr_limit, llr_limit);
+                }
+            }
+        }
+    }
+
+    fn step(&mut self, config: DecoderConfig) {
+        self.update_check_messages(config);
+        self.update_bit_messages(config);
+    }
+
+    fn into_result(self) -> SpaStepResult {
+        SpaStepResult {
+            word: self.word,
+            posterior_llrs: self.posterior,
+        }
+    }
+
     #[cfg(test)]
     fn snapshot(&self) -> StateSnapshot {
         StateSnapshot {
@@ -166,6 +199,52 @@ impl SpaState {
             suffix: float_bits(&self.suffix),
         }
     }
+}
+
+/// Жёсткое слово и итоговые LLR после одного шага SPA.
+///
+/// Оба массива принадлежат результату и имеют длину числа столбцов исходной
+/// проверочной матрицы. Сообщения рёбер остаются внутренним состоянием.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpaStepResult {
+    word: Vec<Bit>,
+    posterior_llrs: Vec<f64>,
+}
+
+impl SpaStepResult {
+    /// Возвращает жёсткое слово в порядке столбцов исходной матрицы.
+    #[must_use]
+    pub fn word(&self) -> &[Bit] {
+        &self.word
+    }
+
+    /// Возвращает ограниченные итоговые LLR в порядке столбцов исходной матрицы.
+    #[must_use]
+    pub fn posterior_llrs(&self) -> &[f64] {
+        &self.posterior_llrs
+    }
+}
+
+/// Выполняет один flooding-шаг алгоритма SPA по разреженной проверочной матрице.
+///
+/// Сначала проверяются LLR и позиции стираний из `input`, затем выполняется
+/// одна итерация независимо от [`DecoderConfig::max_iterations`]. Жёсткое
+/// решение равно [`Bit::Zero`] для LLR `>= 0` и [`Bit::One`] для отрицательного
+/// LLR. Входные срезы не изменяются и не сохраняются в результате.
+///
+/// # Ошибки
+///
+/// Возвращает ошибки длины или содержимого входа из [`LdpcError`], а также
+/// [`LdpcError::SizeOverflow`], если размер рабочих буферов нельзя представить.
+pub fn spa_step(
+    checks: &ParityCheckMatrix,
+    config: DecoderConfig,
+    input: DecodeInput<'_>,
+) -> Result<SpaStepResult, LdpcError> {
+    let mut state = SpaState::try_new(checks)?;
+    state.prepare_block(input, config)?;
+    state.step(config);
+    Ok(state.into_result())
 }
 
 fn hard_decision(llr: f64) -> Bit {
@@ -191,7 +270,6 @@ struct WorkspaceSizes {
     checks: usize,
     bits: usize,
     edges: usize,
-    max_check_degree: usize,
     scratch_len: usize,
 }
 
@@ -212,12 +290,9 @@ fn checked_workspace_sizes(checks: &ParityCheckMatrix) -> Result<WorkspaceSizes,
     checked_vec_bytes::<Vec<usize>>(check_count)?;
     checked_vec_bytes::<Vec<usize>>(bit_count)?;
     checked_vec_bytes::<usize>(edge_count)?;
-    // Канал и posterior — отдельные массивы одинаковой длины.
-    checked_vec_bytes::<f64>(bit_count)?;
+    // Каждый массив указанного типа и длины имеет один и тот же размер в байтах.
     checked_vec_bytes::<f64>(bit_count)?;
     checked_vec_bytes::<Bit>(bit_count)?;
-    // q и r также имеют отдельные массивы по одному значению на ребро.
-    checked_vec_bytes::<f64>(edge_count)?;
     checked_vec_bytes::<f64>(edge_count)?;
 
     let mut max_check_degree = 0;
@@ -239,14 +314,11 @@ fn checked_workspace_sizes(checks: &ParityCheckMatrix) -> Result<WorkspaceSizes,
 
     let scratch_len = scratch_len_for_degree(max_check_degree)?;
     checked_vec_bytes::<f64>(scratch_len)?;
-    checked_vec_bytes::<f64>(scratch_len)?;
-    checked_vec_bytes::<f64>(scratch_len)?;
 
     Ok(WorkspaceSizes {
         checks: check_count,
         bits: bit_count,
         edges: edge_count,
-        max_check_degree,
         scratch_len,
     })
 }
@@ -268,6 +340,10 @@ struct StateSnapshot {
 fn float_bits(values: &[f64]) -> Vec<u64> {
     values.iter().map(|value| value.to_bits()).collect()
 }
+
+#[cfg(test)]
+#[path = "spa/tests.rs"]
+mod step_tests;
 
 #[cfg(test)]
 mod tests {
@@ -293,7 +369,7 @@ mod tests {
             graph.bit_edges,
             [vec![], vec![0, 2, 4], vec![], vec![3], vec![1, 5], vec![]]
         );
-        assert_eq!(graph.max_check_degree, 2);
+        assert_eq!(graph.check_edges.iter().map(Vec::len).max(), Some(2));
     }
 
     #[test]
@@ -341,6 +417,8 @@ mod tests {
             )
             .expect("finite LLRs can be prepared");
 
+        state.step(DecoderConfig::default());
+
         assert_eq!(state.channel[0].to_bits(), (-0.0_f64).to_bits());
         assert_eq!(state.channel[1].to_bits(), 0.0_f64.to_bits());
         assert_eq!(state.word, [Bit::Zero, Bit::Zero, Bit::One, Bit::Zero]);
@@ -348,7 +426,7 @@ mod tests {
 
     #[test]
     fn preparing_a_new_block_resets_every_workspace_buffer() {
-        let checks = ParityCheckMatrix::try_from_rows(3, vec![vec![2, 0], vec![2, 1]])
+        let checks = ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1, 2], vec![1, 2]])
             .expect("matrix is valid");
         let mut state = SpaState::try_new(&checks).expect("sizes are representable");
         state
@@ -361,11 +439,11 @@ mod tests {
             )
             .expect("first block is valid");
 
-        state.q.fill(17.0);
-        state.r.fill(-18.0);
-        state.tanh.fill(0.5);
-        state.prefix.fill(0.25);
-        state.suffix.fill(0.75);
+        state.step(DecoderConfig::default());
+        assert_ne!(state.r, [0.0; 5]);
+        assert_ne!(state.tanh, [0.0; 4]);
+        assert_ne!(state.prefix, [1.0; 4]);
+        assert_ne!(state.suffix, [1.0; 4]);
 
         state
             .prepare_block(
@@ -380,11 +458,11 @@ mod tests {
         assert_eq!(state.channel, [-4.0, 0.0, 5.0]);
         assert_eq!(state.posterior, [-4.0, 0.0, 5.0]);
         assert_eq!(state.word, [Bit::One, Bit::Zero, Bit::Zero]);
-        assert_eq!(state.q, [-4.0, 5.0, 0.0, 5.0]);
-        assert_eq!(state.r, [0.0; 4]);
-        assert_eq!(state.tanh, [0.0; 3]);
-        assert_eq!(state.prefix, [1.0; 3]);
-        assert_eq!(state.suffix, [1.0; 3]);
+        assert_eq!(state.q, [-4.0, 0.0, 5.0, 0.0, 5.0]);
+        assert_eq!(state.r, [0.0; 5]);
+        assert_eq!(state.tanh, [0.0; 4]);
+        assert_eq!(state.prefix, [1.0; 4]);
+        assert_eq!(state.suffix, [1.0; 4]);
     }
 
     #[test]

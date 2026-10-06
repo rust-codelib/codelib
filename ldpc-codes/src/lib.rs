@@ -9,8 +9,6 @@ mod decoder_config;
 mod encoder;
 mod error;
 mod parity_check;
-
-#[cfg(test)]
 mod spa;
 
 pub use bit::Bit;
@@ -20,3 +18,4 @@ pub use decoder_config::DecoderConfig;
 pub use encoder::{Encoder, SystematicEncoder};
 pub use error::LdpcError;
 pub use parity_check::ParityCheckMatrix;
+pub use spa::{spa_step, SpaStepResult};
