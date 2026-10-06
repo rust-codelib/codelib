@@ -346,6 +346,10 @@ fn float_bits(values: &[f64]) -> Vec<u64> {
 mod step_tests;
 
 #[cfg(test)]
+#[path = "spa/reference_tests.rs"]
+mod reference_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{Bit, DecodeInput, DecoderConfig, LdpcError, ParityCheckMatrix};

@@ -105,3 +105,73 @@ fn invalid_input_is_returned_as_an_error() {
 
     assert_eq!(error, LdpcError::NonFiniteLlr { index: 0 });
 }
+
+#[test]
+fn general_plan_llr_examples_match_the_one_step_results() {
+    let checks = ParityCheckMatrix::try_from_rows(
+        6,
+        vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5], vec![2, 3, 5]],
+    )
+    .expect("the general-plan parity-check matrix is valid");
+    let llr_1 = [-1.3863, 1.3863, -1.3863, 1.3863, -1.3863, -1.3863];
+
+    let first = spa_step(
+        &checks,
+        DecoderConfig::default(),
+        DecodeInput {
+            llrs: &llr_1,
+            erasures: &[],
+        },
+    )
+    .expect("LLR_1 is valid");
+
+    assert_eq!(
+        first.word(),
+        [
+            Bit::Zero,
+            Bit::Zero,
+            Bit::One,
+            Bit::Zero,
+            Bit::One,
+            Bit::One
+        ]
+    );
+    assert_eq!(
+        checks.syndrome(first.word()),
+        Ok(vec![Bit::Zero; 4]),
+        "the planned one-step word has zero syndrome"
+    );
+
+    // LLR_2 проверяется только после одного публичного шага; числа получены
+    // прямым произведением tanh по соседям, кроме бита-получателя.
+    let llr_2 = [-0.5, 2.5, -4.0, 5.0, -3.5, 2.5];
+    let second = spa_step(
+        &checks,
+        DecoderConfig::default(),
+        DecodeInput {
+            llrs: &llr_2,
+            erasures: &[],
+        },
+    )
+    .expect("LLR_2 is valid");
+    let expected_posterior: [f64; 6] = [
+        -0.2675508004366969,
+        5.033445248873278,
+        -3.767550800436697,
+        2.278251627292229,
+        -6.221748372707771,
+        -0.7172991383274323,
+    ];
+    for (index, (&expected, &actual)) in expected_posterior
+        .iter()
+        .zip(second.posterior_llrs())
+        .enumerate()
+    {
+        assert!(actual.is_finite(), "posterior[{index}] is not finite");
+        let tolerance = 1e-10 + 1e-10 * expected.abs();
+        assert!(
+            (expected - actual).abs() <= tolerance,
+            "posterior[{index}]: expected {expected}, got {actual}, tolerance {tolerance}"
+        );
+    }
+}
