@@ -29,9 +29,9 @@ use crate::{FieldElement, LinalgError};
 /// assert_eq!(vector.get(3), None);
 /// ```
 ///
-/// Операции требуют одного и того же типа поля. Следующие выражения не
-/// компилируются, хотя сложение, вычитание и умножение на скаляр доступны для
-/// векторов одного поля:
+/// Операции требуют одного и того же типа поля. Методы и операторы отдельно
+/// отвергают векторы над разными полями, а скаляр должен принадлежать полю
+/// вектора:
 ///
 /// ```compile_fail
 /// use gf2m::Gf256;
@@ -40,8 +40,16 @@ use crate::{FieldElement, LinalgError};
 ///
 /// let binary = Vector::<Gf256>::new(vec![Gf256::one()]);
 /// let ternary = Vector::<Gf9>::new(vec![Gf9::one()]);
-/// let _ = &binary + &binary;
 /// let _ = binary.try_add(&ternary);
+/// ```
+///
+/// ```compile_fail
+/// use gf2m::Gf256;
+/// use gf_linalg::Vector;
+/// use gfpm::Gf9;
+///
+/// let binary = Vector::<Gf256>::new(vec![Gf256::one()]);
+/// let ternary = Vector::<Gf9>::new(vec![Gf9::one()]);
 /// let _ = &binary + &ternary;
 /// ```
 ///
@@ -52,8 +60,16 @@ use crate::{FieldElement, LinalgError};
 ///
 /// let binary = Vector::<Gf256>::new(vec![Gf256::one()]);
 /// let ternary = Vector::<Gf9>::new(vec![Gf9::one()]);
-/// let _ = &binary - &binary;
 /// let _ = binary.try_sub(&ternary);
+/// ```
+///
+/// ```compile_fail
+/// use gf2m::Gf256;
+/// use gf_linalg::Vector;
+/// use gfpm::Gf9;
+///
+/// let binary = Vector::<Gf256>::new(vec![Gf256::one()]);
+/// let ternary = Vector::<Gf9>::new(vec![Gf9::one()]);
 /// let _ = &binary - &ternary;
 /// ```
 ///
@@ -63,7 +79,6 @@ use crate::{FieldElement, LinalgError};
 /// use gfpm::Gf9;
 ///
 /// let binary = Vector::<Gf256>::new(vec![Gf256::one()]);
-/// let _ = &binary * Gf256::one();
 /// let _ = &binary * Gf9::one();
 /// ```
 #[derive(Debug, PartialEq, Eq)]

@@ -50,8 +50,8 @@ pub(crate) fn checked_element_count(rows: usize, cols: usize) -> Result<usize, L
 /// # Ok::<(), gf_linalg::LinalgError>(())
 /// ```
 ///
-/// Операции требуют одного и того же типа поля. Следующие выражения не
-/// компилируются, хотя эти операции доступны для матриц и векторов одного поля:
+/// Операции требуют одного и того же типа поля. Методы и операторы отдельно
+/// отвергают матрицы и векторы над разными полями:
 ///
 /// ```compile_fail
 /// use gf2m::Gf256;
@@ -60,8 +60,16 @@ pub(crate) fn checked_element_count(rows: usize, cols: usize) -> Result<usize, L
 ///
 /// let binary = Matrix::<Gf256>::try_new(1, 1, vec![Gf256::one()]).unwrap();
 /// let ternary = Matrix::<Gf9>::try_new(1, 1, vec![Gf9::one()]).unwrap();
-/// let _ = &binary + &binary;
 /// let _ = binary.try_add(&ternary);
+/// ```
+///
+/// ```compile_fail
+/// use gf2m::Gf256;
+/// use gf_linalg::Matrix;
+/// use gfpm::Gf9;
+///
+/// let binary = Matrix::<Gf256>::try_new(1, 1, vec![Gf256::one()]).unwrap();
+/// let ternary = Matrix::<Gf9>::try_new(1, 1, vec![Gf9::one()]).unwrap();
 /// let _ = &binary + &ternary;
 /// ```
 ///
@@ -72,9 +80,27 @@ pub(crate) fn checked_element_count(rows: usize, cols: usize) -> Result<usize, L
 ///
 /// let binary = Matrix::<Gf256>::try_new(1, 1, vec![Gf256::one()]).unwrap();
 /// let ternary = Matrix::<Gf9>::try_new(1, 1, vec![Gf9::one()]).unwrap();
-/// let _ = &binary - &binary;
 /// let _ = binary.try_sub(&ternary);
+/// ```
+///
+/// ```compile_fail
+/// use gf2m::Gf256;
+/// use gf_linalg::Matrix;
+/// use gfpm::Gf9;
+///
+/// let binary = Matrix::<Gf256>::try_new(1, 1, vec![Gf256::one()]).unwrap();
+/// let ternary = Matrix::<Gf9>::try_new(1, 1, vec![Gf9::one()]).unwrap();
 /// let _ = &binary - &ternary;
+/// ```
+///
+/// ```compile_fail
+/// use gf2m::Gf256;
+/// use gf_linalg::Matrix;
+/// use gfpm::Gf9;
+///
+/// let binary = Matrix::<Gf256>::try_new(1, 1, vec![Gf256::one()]).unwrap();
+/// let ternary = Matrix::<Gf9>::try_new(1, 1, vec![Gf9::one()]).unwrap();
+/// let _ = &binary * &ternary;
 /// ```
 ///
 /// ```compile_fail
@@ -83,10 +109,17 @@ pub(crate) fn checked_element_count(rows: usize, cols: usize) -> Result<usize, L
 /// use gfpm::Gf9;
 ///
 /// let binary = Matrix::<Gf256>::try_new(1, 1, vec![Gf256::one()]).unwrap();
-/// let binary_vector = Vector::<Gf256>::new(vec![Gf256::one()]);
 /// let ternary = Vector::<Gf9>::new(vec![Gf9::one()]);
-/// let _ = &binary * &binary_vector;
 /// let _ = binary.try_mul_vector(&ternary);
+/// ```
+///
+/// ```compile_fail
+/// use gf2m::Gf256;
+/// use gf_linalg::{Matrix, Vector};
+/// use gfpm::Gf9;
+///
+/// let binary = Matrix::<Gf256>::try_new(1, 1, vec![Gf256::one()]).unwrap();
+/// let ternary = Vector::<Gf9>::new(vec![Gf9::one()]);
 /// let _ = &binary * &ternary;
 /// ```
 #[derive(Debug, PartialEq, Eq)]
