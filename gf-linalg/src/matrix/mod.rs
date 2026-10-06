@@ -10,6 +10,15 @@ mod operators;
 
 pub use elimination::RrefResult;
 
+pub(crate) fn checked_element_count(rows: usize, cols: usize) -> Result<usize, LinalgError> {
+    if !(1..=MAX_MATRIX_DIM).contains(&rows) || !(1..=MAX_MATRIX_DIM).contains(&cols) {
+        return Err(LinalgError::InvalidDimensions { rows, cols });
+    }
+
+    rows.checked_mul(cols)
+        .ok_or(LinalgError::InvalidDimensions { rows, cols })
+}
+
 /// Прямоугольная матрица элементов поля `F`, хранящая значения по строкам.
 ///
 /// Размер каждой оси находится в диапазоне `1..=MAX_MATRIX_DIM`. Матрица
@@ -100,13 +109,7 @@ impl<F: FieldElement> Matrix<F> {
     /// если число элементов не совпадает с ожидаемым. Размеры проверяются до
     /// длины `data`.
     pub fn try_new(rows: usize, cols: usize, data: Vec<F>) -> Result<Self, LinalgError> {
-        if !(1..=MAX_MATRIX_DIM).contains(&rows) || !(1..=MAX_MATRIX_DIM).contains(&cols) {
-            return Err(LinalgError::InvalidDimensions { rows, cols });
-        }
-
-        let expected = rows
-            .checked_mul(cols)
-            .ok_or(LinalgError::InvalidDimensions { rows, cols })?;
+        let expected = checked_element_count(rows, cols)?;
         if data.len() != expected {
             return Err(LinalgError::ElementCountMismatch {
                 expected,

@@ -68,6 +68,7 @@
 //! }
 //! ```
 
+use crate::matrix::checked_element_count;
 use crate::{FieldElement, LinalgError, Matrix, Vector, MAX_MATRIX_DIM};
 use std::mem::size_of;
 
@@ -231,12 +232,7 @@ impl<F: FieldElement> Matrix<F> {
             }
         }
 
-        let element_count = row_count
-            .checked_mul(cols)
-            .ok_or(LinalgError::InvalidDimensions {
-                rows: row_count,
-                cols,
-            })?;
+        let element_count = checked_element_count(row_count, cols)?;
         let mut data = Vec::with_capacity(element_count);
         for row in rows {
             data.extend_from_slice(&row);
