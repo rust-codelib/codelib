@@ -40,6 +40,13 @@ pub enum LdpcError {
         /// Номер повторяющегося бита.
         bit: usize,
     },
+    /// Длина слова не совпадает с числом столбцов проверочной матрицы.
+    WordLengthMismatch {
+        /// Ожидаемое число битов.
+        expected: usize,
+        /// Фактическое число битов во входном слове.
+        actual: usize,
+    },
     /// Размер внутреннего хранилища не представим типом `usize`.
     SizeOverflow,
 }
@@ -67,6 +74,10 @@ impl fmt::Display for LdpcError {
             Self::DuplicateBitIndex { check, bit } => {
                 write!(f, "бит {bit} повторяется в проверке {check}")
             }
+            Self::WordLengthMismatch { expected, actual } => write!(
+                f,
+                "длина слова {actual} не совпадает с ожидаемой длиной {expected}"
+            ),
             Self::SizeOverflow => write!(f, "переполнение размера внутреннего хранилища"),
         }
     }

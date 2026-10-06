@@ -3,7 +3,7 @@
 use core::mem::size_of;
 use gf_linalg::MAX_MATRIX_DIM;
 
-use crate::LdpcError;
+use crate::{Bit, LdpcError};
 
 /// Проверочная матрица `H`, хранящая только позиции единиц по строкам.
 ///
@@ -127,5 +127,51 @@ impl ParityCheckMatrix {
     #[must_use]
     pub fn bit_checks(&self, bit: usize) -> Option<&[usize]> {
         self.bit_checks.get(bit).map(Vec::as_slice)
+    }
+
+    /// Вычисляет синдром слова в порядке проверок исходной матрицы.
+    ///
+    /// Длина `word` должна совпадать с числом столбцов. Каждый бит результата
+    /// равен XOR битов, входящих в соответствующую строку `H`; пустая строка
+    /// даёт [`Bit::Zero`]. Матрица и входное слово не изменяются.
+    ///
+    /// # Ошибки
+    ///
+    /// Возвращает [`LdpcError::WordLengthMismatch`], если длина слова не равна
+    /// [`cols`](Self::cols).
+    pub fn syndrome(&self, word: &[Bit]) -> Result<Vec<Bit>, LdpcError> {
+        if word.len() != self.bits {
+            return Err(LdpcError::WordLengthMismatch {
+                expected: self.bits,
+                actual: word.len(),
+            });
+        }
+
+        Ok(self
+            .check_bits
+            .iter()
+            .map(|bits| {
+                bits.iter().fold(Bit::Zero, |parity, &bit| match word[bit] {
+                    Bit::Zero => parity,
+                    Bit::One => match parity {
+                        Bit::Zero => Bit::One,
+                        Bit::One => Bit::Zero,
+                    },
+                })
+            })
+            .collect())
+    }
+
+    /// Проверяет, удовлетворяет ли слово всем строкам проверочной матрицы.
+    ///
+    /// Возвращает `true`, если синдром нулевой. Длина `word` должна совпадать
+    /// с числом столбцов; матрица и входное слово не изменяются.
+    ///
+    /// # Ошибки
+    ///
+    /// Возвращает [`LdpcError::WordLengthMismatch`], если длина слова не равна
+    /// [`cols`](Self::cols).
+    pub fn is_codeword(&self, word: &[Bit]) -> Result<bool, LdpcError> {
+        Ok(self.syndrome(word)?.iter().all(|&bit| bit == Bit::Zero))
     }
 }
