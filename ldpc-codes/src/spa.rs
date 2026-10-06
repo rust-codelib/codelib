@@ -116,6 +116,43 @@ impl SpaState {
         Ok(())
     }
 
+    fn update_check_messages(&mut self, config: DecoderConfig) {
+        for edges in &self.graph.check_edges {
+            match edges.as_slice() {
+                [] => {}
+                [edge] => self.r[*edge] = config.llr_limit(),
+                [first, second] => {
+                    self.r[*first] = self.q[*second];
+                    self.r[*second] = self.q[*first];
+                }
+                _ => {
+                    let degree = edges.len();
+                    let llr_limit = config.llr_limit();
+
+                    for (index, &edge) in edges.iter().enumerate() {
+                        let q = self.q[edge].clamp(-llr_limit, llr_limit);
+                        self.tanh[index] = (q / 2.0).tanh();
+                    }
+
+                    self.prefix[0] = 1.0;
+                    for index in 0..degree {
+                        self.prefix[index + 1] = self.prefix[index] * self.tanh[index];
+                    }
+
+                    self.suffix[degree] = 1.0;
+                    for index in (0..degree).rev() {
+                        self.suffix[index] = self.tanh[index] * self.suffix[index + 1];
+                    }
+
+                    for (index, &edge) in edges.iter().enumerate() {
+                        let product = self.prefix[index] * self.suffix[index + 1];
+                        self.r[edge] = llr_from_product(product, config);
+                    }
+                }
+            }
+        }
+    }
+
     #[cfg(test)]
     fn snapshot(&self) -> StateSnapshot {
         StateSnapshot {
@@ -137,6 +174,16 @@ fn hard_decision(llr: f64) -> Bit {
     } else {
         Bit::One
     }
+}
+
+fn llr_from_product(product: f64, config: DecoderConfig) -> f64 {
+    if product == 0.0 {
+        return 0.0;
+    }
+
+    let product_limit = 1.0 - f64::EPSILON;
+    let product = product.clamp(-product_limit, product_limit);
+    (product.ln_1p() - (-product).ln_1p()).clamp(-config.llr_limit(), config.llr_limit())
 }
 
 #[derive(Clone, Copy)]
@@ -399,5 +446,203 @@ mod tests {
             scratch_len_for_degree(usize::MAX),
             Err(LdpcError::SizeOverflow)
         );
+    }
+
+    #[test]
+    fn check_messages_handle_degrees_zero_one_and_two_exactly() {
+        let checks = ParityCheckMatrix::try_from_rows(2, vec![vec![], vec![0], vec![0, 1]])
+            .expect("matrix is valid");
+        let mut state = SpaState::try_new(&checks).expect("sizes are representable");
+        let config = DecoderConfig::try_new(0, 7.0).expect("limit is valid");
+        state
+            .prepare_block(
+                DecodeInput {
+                    llrs: &[3.0, -4.0],
+                    erasures: &[],
+                },
+                config,
+            )
+            .expect("input is valid");
+        let old_q = float_bits(&state.q);
+
+        state.update_check_messages(config);
+
+        assert_eq!(state.r, [7.0, -4.0, 3.0]);
+        assert_eq!(float_bits(&state.q), old_q);
+    }
+
+    #[test]
+    fn degree_three_messages_match_the_hand_calculation() {
+        let checks =
+            ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1, 2]]).expect("matrix is valid");
+        let mut state = SpaState::try_new(&checks).expect("sizes are representable");
+        let llr = 3.0_f64.ln();
+        state
+            .prepare_block(
+                DecodeInput {
+                    llrs: &[llr, llr, llr],
+                    erasures: &[],
+                },
+                DecoderConfig::default(),
+            )
+            .expect("input is valid");
+        let old_q = float_bits(&state.q);
+
+        state.update_check_messages(DecoderConfig::default());
+
+        for &message in &state.r {
+            assert_close((5.0_f64 / 3.0).ln(), message);
+        }
+        assert_eq!(float_bits(&state.q), old_q);
+    }
+
+    #[test]
+    fn check_messages_preserve_sign_and_handle_one_zero_multiplier() {
+        let checks =
+            ParityCheckMatrix::try_from_rows(4, vec![vec![0, 1, 2]]).expect("matrix is valid");
+        let mut state = SpaState::try_new(&checks).expect("sizes are representable");
+        let llr = 3.0_f64.ln();
+        state
+            .prepare_block(
+                DecodeInput {
+                    llrs: &[llr, -llr, llr, 0.0],
+                    erasures: &[],
+                },
+                DecoderConfig::default(),
+            )
+            .expect("input is valid");
+
+        state.update_check_messages(DecoderConfig::default());
+
+        assert_close((3.0_f64 / 5.0).ln(), state.r[0]);
+        assert_close((5.0_f64 / 3.0).ln(), state.r[1]);
+        assert_close((3.0_f64 / 5.0).ln(), state.r[2]);
+
+        let checks =
+            ParityCheckMatrix::try_from_rows(4, vec![vec![0, 1, 2, 3]]).expect("matrix is valid");
+        let mut state = SpaState::try_new(&checks).expect("sizes are representable");
+        state
+            .prepare_block(
+                DecodeInput {
+                    llrs: &[llr, -llr, 0.0, llr],
+                    erasures: &[],
+                },
+                DecoderConfig::default(),
+            )
+            .expect("input is valid");
+
+        state.update_check_messages(DecoderConfig::default());
+
+        assert_eq!(state.r[0], 0.0);
+        assert_eq!(state.r[1], 0.0);
+        assert_close((7.0_f64 / 9.0).ln(), state.r[2]);
+        assert_eq!(state.r[3], 0.0);
+    }
+
+    #[test]
+    fn two_zero_multipliers_make_every_excluded_product_zero() {
+        let checks =
+            ParityCheckMatrix::try_from_rows(4, vec![vec![0, 1, 2, 3]]).expect("matrix is valid");
+        let mut state = SpaState::try_new(&checks).expect("sizes are representable");
+        state
+            .prepare_block(
+                DecodeInput {
+                    llrs: &[3.0_f64.ln(), 0.0, 0.0, -3.0_f64.ln()],
+                    erasures: &[],
+                },
+                DecoderConfig::default(),
+            )
+            .expect("input is valid");
+
+        state.update_check_messages(DecoderConfig::default());
+
+        assert_eq!(state.r, [0.0; 4]);
+    }
+
+    #[test]
+    fn product_conversion_clamps_unit_boundaries_and_keeps_zero_exact() {
+        let config = DecoderConfig::try_new(0, 6.5).expect("limit is valid");
+
+        assert_eq!(llr_from_product(1.0, config), 6.5);
+        assert_eq!(llr_from_product(-1.0, config), -6.5);
+        assert_eq!(llr_from_product(0.0, config).to_bits(), 0.0_f64.to_bits());
+    }
+
+    #[test]
+    fn extreme_channel_values_produce_finite_bounded_messages() {
+        let checks =
+            ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1, 2]]).expect("matrix is valid");
+        let mut state = SpaState::try_new(&checks).expect("sizes are representable");
+        let config = DecoderConfig::default();
+        state
+            .prepare_block(
+                DecodeInput {
+                    llrs: &[f64::MAX, -f64::MAX, f64::MAX],
+                    erasures: &[],
+                },
+                config,
+            )
+            .expect("finite extreme inputs are saturated");
+        let old_q = float_bits(&state.q);
+
+        state.update_check_messages(config);
+
+        assert_eq!(state.q, [20.0, -20.0, 20.0]);
+        assert_eq!(float_bits(&state.q), old_q);
+        assert_finite_in_range(&state.r, -20.0, 20.0);
+        assert_finite_in_range(&state.tanh, -1.0, 1.0);
+        assert_finite_in_range(&state.prefix, -1.0, 1.0);
+        assert_finite_in_range(&state.suffix, -1.0, 1.0);
+    }
+
+    #[test]
+    fn degree_4096_uses_finite_reusable_scratch_without_changing_q() {
+        let degree = 4096;
+        let bits: Vec<_> = (0..degree).collect();
+        let checks = ParityCheckMatrix::try_from_rows(degree, vec![bits]).expect("matrix is valid");
+        let mut state = SpaState::try_new(&checks).expect("sizes are representable");
+        let llrs = vec![f64::MAX; degree];
+        let config = DecoderConfig::default();
+        state
+            .prepare_block(
+                DecodeInput {
+                    llrs: &llrs,
+                    erasures: &[],
+                },
+                config,
+            )
+            .expect("finite extreme inputs are saturated");
+        let old_q = float_bits(&state.q);
+
+        state.update_check_messages(config);
+
+        assert_eq!(state.r.len(), degree);
+        assert_eq!(state.tanh.len(), degree + 1);
+        assert_eq!(state.prefix.len(), degree + 1);
+        assert_eq!(state.suffix.len(), degree + 1);
+        assert_eq!(float_bits(&state.q), old_q);
+        assert_finite_in_range(&state.r, -20.0, 20.0);
+        assert_finite_in_range(&state.tanh, -1.0, 1.0);
+        assert_finite_in_range(&state.prefix, -1.0, 1.0);
+        assert_finite_in_range(&state.suffix, -1.0, 1.0);
+    }
+
+    fn assert_close(expected: f64, actual: f64) {
+        assert!(actual.is_finite(), "actual value is not finite: {actual}");
+        let tolerance = 1e-10 + 1e-10 * expected.abs();
+        assert!(
+            (expected - actual).abs() <= tolerance,
+            "expected {expected}, got {actual}, tolerance {tolerance}"
+        );
+    }
+
+    fn assert_finite_in_range(values: &[f64], min: f64, max: f64) {
+        for (index, &value) in values.iter().enumerate() {
+            assert!(value.is_finite(), "value at index {index} is not finite");
+            assert!(
+                (min..=max).contains(&value),
+                "value at index {index} is outside [{min}, {max}]: {value}"
+            );
+        }
     }
 }
