@@ -17,6 +17,31 @@ pub enum LdpcError {
         /// Упакованное представление элемента.
         value: u64,
     },
+    /// Размер проверочной матрицы выходит за допустимые пределы.
+    InvalidDimensions {
+        /// Число проверок (строк).
+        rows: usize,
+        /// Число битов (столбцов).
+        cols: usize,
+    },
+    /// Индекс бита находится за пределами строки проверочной матрицы.
+    BitIndexOutOfBounds {
+        /// Номер проверки, начиная с нуля.
+        check: usize,
+        /// Номер недопустимого бита.
+        bit: usize,
+        /// Число битов в матрице.
+        bits: usize,
+    },
+    /// Бит повторяется в одной проверке.
+    DuplicateBitIndex {
+        /// Номер проверки, начиная с нуля.
+        check: usize,
+        /// Номер повторяющегося бита.
+        bit: usize,
+    },
+    /// Размер внутреннего хранилища не представим типом `usize`.
+    SizeOverflow,
 }
 
 impl fmt::Display for LdpcError {
@@ -31,6 +56,18 @@ impl fmt::Display for LdpcError {
                     "элемент вектора с индексом {index} не является битом GF(2): {value}"
                 )
             }
+            Self::InvalidDimensions { rows, cols } => write!(
+                f,
+                "недопустимый размер проверочной матрицы: {rows} × {cols}"
+            ),
+            Self::BitIndexOutOfBounds { check, bit, bits } => write!(
+                f,
+                "индекс бита {bit} в проверке {check} выходит за границы 0..{bits}"
+            ),
+            Self::DuplicateBitIndex { check, bit } => {
+                write!(f, "бит {bit} повторяется в проверке {check}")
+            }
+            Self::SizeOverflow => write!(f, "переполнение размера внутреннего хранилища"),
         }
     }
 }
