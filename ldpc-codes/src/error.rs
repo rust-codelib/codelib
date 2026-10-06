@@ -47,6 +47,8 @@ pub enum LdpcError {
         /// Фактическое число битов во входном слове.
         actual: usize,
     },
+    /// Предел LLR не является конечным числом из диапазона `(0, 20]`.
+    InvalidLlrLimit,
     /// Ранг проверочной матрицы не позволяет построить систематический кодер.
     InvalidEncoderRank {
         /// Ранг проверочной матрицы.
@@ -101,6 +103,10 @@ impl fmt::Display for LdpcError {
             Self::WordLengthMismatch { expected, actual } => write!(
                 f,
                 "длина слова {actual} не совпадает с ожидаемой длиной {expected}"
+            ),
+            Self::InvalidLlrLimit => write!(
+                f,
+                "предел LLR должен быть конечным и находиться в диапазоне (0, 20]"
             ),
             Self::InvalidEncoderRank { rank, cols } => write!(
                 f,
