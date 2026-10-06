@@ -1,5 +1,5 @@
 use ldpc_codes::{
-    bits_to_vector, count_bit_errors, vector_to_bits, Bit, DecodeInput, DecodeStatus, Decoder,
+    bits_to_vector, count_bit_errors, vector_to_bits, Bit, DecodeInput, DecodeStatus,
     DecoderConfig, Encoder, LdpcConfigurator, LdpcError, ParityCheckMatrix,
 };
 
@@ -12,7 +12,7 @@ fn main() -> Result<(), LdpcError> {
     let mut configured = LdpcConfigurator::build(checks, DecoderConfig::try_new(1, 20.0)?)?;
     let encoded_word = configured.encoder().encode(&message)?;
     let llrs = [-2.0, 1.0, -3.0];
-    let result = configured.decoder_mut().decode(
+    let result = configured.decode(
         DecodeInput {
             llrs: &llrs,
             erasures: &[],

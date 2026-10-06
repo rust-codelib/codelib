@@ -12,6 +12,7 @@ mod diagnostics;
 mod encoder;
 mod error;
 mod parity_check;
+mod size;
 mod spa;
 
 pub use bit::Bit;

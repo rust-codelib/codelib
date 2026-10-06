@@ -1,17 +1,23 @@
-//! Канальные данные для одного шага SPA.
+//! Канальные данные для шага или полного декодирования SPA.
 
-/// Заимствованные канальные LLR и позиции стираний.
+/// Заимствованные канальные LLR и позиции стираний для [`crate::spa_step`] и
+/// [`crate::Decoder::decode`].
 ///
 /// Значение `llrs[i]` относится к биту с индексом `i` в порядке столбцов
-/// исходной проверочной матрицы. Срезы не копируются в этот тип и не
-/// изменяются им. [`crate::spa_step`] также не сохраняет ссылки после вызова.
+/// исходной проверочной матрицы. Срезы не копируются в этот тип и не изменяются
+/// им. Оба API не сохраняют ссылки после вызова.
 ///
-/// Перед вычислением [`crate::spa_step`] проверяет длину LLR, конечность всех
-/// значений (в том числе на стираемых позициях), границы индексов стираний и
-/// повторы индексов именно в таком порядке. После успешной проверки значения
-/// ограничиваются пределом конфигурации, а стираемые позиции заменяются на
-/// `0.0`. Стирание означает отсутствие предпочтения между битами, а не
-/// инверсию значения.
+/// Перед вычислением оба API проверяют длину LLR, конечность всех значений (в
+/// том числе на стираемых позициях), границы индексов стираний и повторы именно
+/// в таком порядке. После успешной проверки значения ограничиваются пределом
+/// конфигурации, а стираемые позиции заменяются на `0.0`. Стирание означает
+/// отсутствие предпочтения между битами, а не инверсию значения.
+///
+/// При ошибке входа `SpaDecoder` не меняет содержательное состояние блока и не
+/// отправляет события. Для проверки повторов он может очистить или частично
+/// заполнить внутреннюю служебную маску стираний; следующий вызов сбрасывает
+/// эту маску перед проверкой. Эта маска не влияет на результаты и недоступна
+/// вызывающему коду.
 #[derive(Debug, Clone, Copy)]
 pub struct DecodeInput<'a> {
     /// Канальное LLR для каждого бита кодового слова в порядке столбцов `H`.
@@ -20,16 +26,22 @@ pub struct DecodeInput<'a> {
     pub erasures: &'a [usize],
 }
 
-/// Проверяет вход и возвращает новый массив канальных LLR.
+/// Проверяет вход и записывает подготовленные канальные LLR в переиспользуемый
+/// буфер.
 ///
-/// Сначала завершаются все проверки входа, поэтому состояние заменяется только
-/// после успешной подготовки отдельного канального массива.
+/// Сначала проверяются все значения и индексы. Проверка повторов использует
+/// переиспользуемую маску и может оставить её очищенной или частично заполненной
+/// при ошибке; канал и остальное содержательное состояние до полного успеха не
+/// меняются. После успеха в канал записываются ограниченные LLR и нули для
+/// стираний. Выделений памяти при подготовке нет.
 pub(crate) fn prepare_channel(
     input: DecodeInput<'_>,
-    bits: usize,
+    channel: &mut [f64],
+    erased_positions: &mut [bool],
     config: crate::DecoderConfig,
-) -> Result<Vec<f64>, crate::LdpcError> {
-    use core::mem::size_of;
+) -> Result<(), crate::LdpcError> {
+    let bits = channel.len();
+    debug_assert_eq!(erased_positions.len(), bits);
 
     if input.llrs.len() != bits {
         return Err(crate::LdpcError::LlrLengthMismatch {
@@ -51,9 +63,7 @@ pub(crate) fn prepare_channel(
         return Err(crate::LdpcError::ErasureIndexOutOfBounds { bit, bits });
     }
 
-    bits.checked_mul(size_of::<bool>())
-        .ok_or(crate::LdpcError::SizeOverflow)?;
-    let mut erased_positions = vec![false; bits];
+    erased_positions.fill(false);
     for &bit in input.erasures {
         if erased_positions[bit] {
             return Err(crate::LdpcError::DuplicateErasureIndex { bit });
@@ -61,18 +71,28 @@ pub(crate) fn prepare_channel(
         erased_positions[bit] = true;
     }
 
-    bits.checked_mul(size_of::<f64>())
-        .ok_or(crate::LdpcError::SizeOverflow)?;
-
     let limit = config.llr_limit();
-    let mut channel = Vec::with_capacity(bits);
-    for &llr in input.llrs {
-        channel.push(llr.clamp(-limit, limit));
+    for (prepared, &llr) in channel.iter_mut().zip(input.llrs) {
+        *prepared = llr.clamp(-limit, limit);
     }
     for &bit in input.erasures {
         channel[bit] = 0.0;
     }
 
+    Ok(())
+}
+
+// Keeps the independent reference tests focused on input semantics while the
+// production decoder writes into its reusable buffers.
+#[cfg(test)]
+pub(crate) fn prepared_channel(
+    input: DecodeInput<'_>,
+    bits: usize,
+    config: crate::DecoderConfig,
+) -> Result<Vec<f64>, crate::LdpcError> {
+    let mut channel = vec![0.0; bits];
+    let mut erased_positions = vec![false; bits];
+    prepare_channel(input, &mut channel, &mut erased_positions, config)?;
     Ok(channel)
 }
 
@@ -81,12 +101,23 @@ mod tests {
     use super::{prepare_channel, DecodeInput};
     use crate::{DecoderConfig, LdpcError};
 
+    fn prepare(
+        input: DecodeInput<'_>,
+        bits: usize,
+        config: DecoderConfig,
+    ) -> Result<Vec<f64>, LdpcError> {
+        let mut channel = vec![0.0; bits];
+        let mut erased_positions = vec![false; bits];
+        prepare_channel(input, &mut channel, &mut erased_positions, config)?;
+        Ok(channel)
+    }
+
     #[test]
     fn preparation_clips_extreme_finite_values_and_zeroes_erasures() {
         let llrs = [f64::MAX, -f64::MAX, 1.25, -2.5];
         let erasures = [2];
 
-        let channel = prepare_channel(
+        let channel = prepare(
             DecodeInput {
                 llrs: &llrs,
                 erasures: &erasures,
@@ -105,7 +136,7 @@ mod tests {
     fn preparation_accepts_no_erasures_and_erasing_every_bit() {
         let llrs = [-30.0, 4.0, 30.0];
         let config = DecoderConfig::default();
-        let unerased = prepare_channel(
+        let unerased = prepare(
             DecodeInput {
                 llrs: &llrs,
                 erasures: &[],
@@ -114,7 +145,7 @@ mod tests {
             config,
         )
         .expect("an empty erasure list is valid");
-        let fully_erased = prepare_channel(
+        let fully_erased = prepare(
             DecodeInput {
                 llrs: &llrs,
                 erasures: &[0, 1, 2],
@@ -134,7 +165,7 @@ mod tests {
         let llrs = [f64::NAN];
         let erasures = [9, 9];
 
-        let error = prepare_channel(
+        let error = prepare(
             DecodeInput {
                 llrs: &llrs,
                 erasures: &erasures,
@@ -158,7 +189,7 @@ mod tests {
         let llrs = [1.0, f64::INFINITY, f64::NAN];
         let erasures = [3, 1];
 
-        let error = prepare_channel(
+        let error = prepare(
             DecodeInput {
                 llrs: &llrs,
                 erasures: &erasures,
@@ -180,7 +211,7 @@ mod tests {
         let llrs = [0.0; 3];
         let erasures = [1, 1, 3];
 
-        let error = prepare_channel(
+        let error = prepare(
             DecodeInput {
                 llrs: &llrs,
                 erasures: &erasures,
@@ -201,7 +232,7 @@ mod tests {
         let llrs = [0.0; 3];
         let erasures = [2, 1, 2, 1];
 
-        let error = prepare_channel(
+        let error = prepare(
             DecodeInput {
                 llrs: &llrs,
                 erasures: &erasures,

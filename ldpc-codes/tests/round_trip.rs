@@ -1,5 +1,5 @@
 use ldpc_codes::{
-    bits_to_vector, count_bit_errors, vector_to_bits, Bit, DecodeInput, DecodeStatus, Decoder,
+    bits_to_vector, count_bit_errors, vector_to_bits, Bit, DecodeInput, DecodeStatus,
     DecoderConfig, Encoder, LdpcConfigurator, ParityCheckMatrix,
 };
 
@@ -44,7 +44,6 @@ fn noiseless_round_trip_preserves_zero_and_trailing_zero_messages() {
             })
             .collect();
         let result = configured
-            .decoder_mut()
             .decode(
                 DecodeInput {
                     llrs: &llrs,
@@ -90,7 +89,6 @@ fn spa_corrects_the_planned_channel_values_and_round_trips_the_message() {
 
     let llrs = [-2.0, 1.0, -3.0];
     let result = configured
-        .decoder_mut()
         .decode(
             DecodeInput {
                 llrs: &llrs,
@@ -128,7 +126,6 @@ fn exhausted_iteration_budget_reports_status_without_extracting_message() {
         .expect("message has length k");
     let llrs = [-2.0, 1.0, -3.0];
     let result = configured
-        .decoder_mut()
         .decode(
             DecodeInput {
                 llrs: &llrs,

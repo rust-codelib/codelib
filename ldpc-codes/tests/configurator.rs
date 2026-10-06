@@ -1,5 +1,5 @@
 use ldpc_codes::{
-    Bit, DecodeInput, DecodeStatus, Decoder, DecoderConfig, Encoder, LdpcConfigurator, LdpcError,
+    Bit, DecodeInput, DecodeStatus, DecoderConfig, Encoder, LdpcConfigurator, LdpcError,
     ParityCheckMatrix,
 };
 
@@ -39,7 +39,6 @@ fn build_derives_dimensions_and_nonleading_information_positions_from_rank() {
         })
         .collect();
     let result = configured
-        .decoder_mut()
         .decode(
             DecodeInput {
                 llrs: &llrs,
@@ -69,7 +68,6 @@ fn decoder_syndrome_keeps_duplicate_and_empty_source_rows_in_order() {
     .expect("dependent and empty checks are allowed");
 
     let result = configured
-        .decoder_mut()
         .decode(
             DecodeInput {
                 llrs: &[-1.0, 1.0, 1.0, 1.0, 1.0],

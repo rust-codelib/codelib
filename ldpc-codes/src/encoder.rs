@@ -1,7 +1,7 @@
-use core::mem::size_of;
+use gf_linalg::Matrix;
 
-use gf_linalg::{Matrix, Vector, MAX_MATRIX_DIM};
-
+use crate::bit::count_ones;
+use crate::size::check_buffer_bytes;
 use crate::{bits_to_vector, vector_to_bits, Bit, Gf2, LdpcError, ParityCheckMatrix};
 
 /// Общий контракт систематического кодера двоичного блока.
@@ -48,14 +48,9 @@ pub trait Encoder {
 fn dense_from_checks(checks: &ParityCheckMatrix) -> Result<Matrix<Gf2>, LdpcError> {
     let rows = checks.rows();
     let cols = checks.cols();
-    if !(1..=MAX_MATRIX_DIM).contains(&rows) || !(1..=MAX_MATRIX_DIM).contains(&cols) {
-        return Err(LdpcError::InvalidDimensions { rows, cols });
-    }
 
     let element_count = rows.checked_mul(cols).ok_or(LdpcError::SizeOverflow)?;
-    element_count
-        .checked_mul(size_of::<Gf2>())
-        .ok_or(LdpcError::SizeOverflow)?;
+    check_buffer_bytes::<Gf2>(element_count)?;
 
     let mut data = vec![Gf2::zero(); element_count];
     for row in 0..rows {
@@ -70,12 +65,6 @@ fn dense_from_checks(checks: &ParityCheckMatrix) -> Result<Matrix<Gf2>, LdpcErro
     Ok(Matrix::try_new(rows, cols, data)?)
 }
 
-fn check_buffer_size<T>(len: usize) -> Result<(), LdpcError> {
-    len.checked_mul(size_of::<T>())
-        .ok_or(LdpcError::SizeOverflow)?;
-    Ok(())
-}
-
 /// Систематический кодер, подготовленный по проверочной матрице `H`.
 ///
 /// Кодер выбирает непивотные столбцы как информационные, а опорные столбцы —
@@ -88,7 +77,6 @@ pub struct SystematicEncoder {
     checks: ParityCheckMatrix,
     parity_coefficients: Matrix<Gf2>,
     systematic_to_original: Vec<usize>,
-    original_to_systematic: Vec<usize>,
 }
 
 impl SystematicEncoder {
@@ -118,12 +106,12 @@ impl SystematicEncoder {
         }
 
         let information_len = cols.checked_sub(rank).ok_or(LdpcError::SizeOverflow)?;
-        check_buffer_size::<usize>(information_len)?;
-        check_buffer_size::<usize>(cols)?;
+        check_buffer_bytes::<usize>(information_len)?;
+        check_buffer_bytes::<usize>(cols)?;
         let parity_element_count = rank
             .checked_mul(information_len)
             .ok_or(LdpcError::SizeOverflow)?;
-        check_buffer_size::<Gf2>(parity_element_count)?;
+        check_buffer_bytes::<Gf2>(parity_element_count)?;
 
         let mut systematic_to_original = Vec::with_capacity(cols);
         let pivot_columns = reduced.pivot_columns();
@@ -133,11 +121,6 @@ impl SystematicEncoder {
             }
         }
         systematic_to_original.extend_from_slice(pivot_columns);
-
-        let mut original_to_systematic = vec![0; cols];
-        for (systematic, &original) in systematic_to_original.iter().enumerate() {
-            original_to_systematic[original] = systematic;
-        }
 
         let mut parity_data = Vec::with_capacity(parity_element_count);
         for row in 0..rank {
@@ -155,7 +138,6 @@ impl SystematicEncoder {
             checks,
             parity_coefficients,
             systematic_to_original,
-            original_to_systematic,
         })
     }
 
@@ -163,6 +145,10 @@ impl SystematicEncoder {
     #[must_use]
     pub fn rank(&self) -> usize {
         self.parity_coefficients.rows()
+    }
+
+    pub(crate) fn checks(&self) -> &ParityCheckMatrix {
+        &self.checks
     }
 
     /// Возвращает исходные позиции информационных столбцов по возрастанию.
@@ -200,20 +186,16 @@ impl Encoder for SystematicEncoder {
 
         let information = bits_to_vector(message);
         let parity = self.parity_coefficients.try_mul_vector(&information)?;
-        let systematic_len = information
-            .len()
-            .checked_add(parity.len())
-            .ok_or(LdpcError::SizeOverflow)?;
-        check_buffer_size::<Gf2>(systematic_len)?;
+        let parity_bits = vector_to_bits(&parity)?;
+        let codeword_len = self.codeword_len();
+        check_buffer_bytes::<Bit>(codeword_len)?;
 
-        let mut systematic_data = Vec::with_capacity(systematic_len);
-        systematic_data.extend_from_slice(information.as_slice());
-        systematic_data.extend_from_slice(parity.as_slice());
-        let systematic_word = vector_to_bits(&Vector::<Gf2>::new(systematic_data))?;
-
-        let mut word = vec![Bit::Zero; self.codeword_len()];
-        for (original, &systematic) in self.original_to_systematic.iter().enumerate() {
-            word[original] = systematic_word[systematic];
+        let mut word = vec![Bit::Zero; codeword_len];
+        for (&bit, &position) in message.iter().zip(self.information_positions()) {
+            word[position] = bit;
+        }
+        for (&bit, &position) in parity_bits.iter().zip(self.parity_positions()) {
+            word[position] = bit;
         }
 
         Ok(word)
@@ -228,12 +210,7 @@ impl Encoder for SystematicEncoder {
             });
         }
 
-        let unsatisfied_checks = self
-            .checks
-            .syndrome(word)?
-            .iter()
-            .filter(|&&bit| bit == Bit::One)
-            .count();
+        let unsatisfied_checks = count_ones(&self.checks.syndrome(word)?);
         if unsatisfied_checks != 0 {
             return Err(LdpcError::InvalidCodeword { unsatisfied_checks });
         }
@@ -249,7 +226,7 @@ impl Encoder for SystematicEncoder {
 mod tests {
     use gf_linalg::Matrix;
 
-    use crate::{encoder::dense_from_checks, Gf2, LdpcError, ParityCheckMatrix, SystematicEncoder};
+    use crate::{encoder::dense_from_checks, Encoder, Gf2, ParityCheckMatrix, SystematicEncoder};
 
     #[test]
     fn dense_conversion_preserves_shape_entries_and_sparse_source() {
@@ -323,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    fn preparation_builds_exact_coefficients_and_inverse_permutations_for_main_example() {
+    fn preparation_builds_exact_coefficients_and_mapping_for_main_example() {
         let checks = ParityCheckMatrix::try_from_rows(
             6,
             vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5], vec![2, 3, 5]],
@@ -337,12 +314,11 @@ mod tests {
             Matrix::try_new(3, 3, [0, 1, 1, 1, 1, 1, 1, 0, 1].map(Gf2::new).to_vec()).unwrap()
         );
         assert_eq!(encoder.systematic_to_original, [3, 4, 5, 0, 1, 2]);
-        assert_eq!(encoder.original_to_systematic, [3, 4, 5, 0, 1, 2]);
-        assert_permutations_are_inverse(&encoder);
+        assert_mapping_is_permutation(&encoder);
     }
 
     #[test]
-    fn preparation_builds_exact_coefficients_and_distinct_inverse_permutations_for_cycle_three() {
+    fn preparation_builds_exact_coefficients_and_mapping_for_cycle_three() {
         let checks =
             ParityCheckMatrix::try_from_rows(5, vec![vec![0, 1, 4], vec![2, 3, 4]]).unwrap();
 
@@ -353,8 +329,7 @@ mod tests {
             Matrix::try_new(2, 3, [1, 0, 1, 0, 1, 1].map(Gf2::new).to_vec()).unwrap()
         );
         assert_eq!(encoder.systematic_to_original, [1, 3, 4, 0, 2]);
-        assert_eq!(encoder.original_to_systematic, [3, 0, 4, 1, 2]);
-        assert_permutations_are_inverse(&encoder);
+        assert_mapping_is_permutation(&encoder);
     }
 
     #[test]
@@ -364,29 +339,21 @@ mod tests {
         )
         .unwrap();
         assert_eq!(swap.systematic_to_original, [0, 2, 1]);
-        assert_eq!(swap.original_to_systematic, [0, 2, 1]);
+        assert_mapping_is_permutation(&swap);
 
         let identity =
             SystematicEncoder::try_new(ParityCheckMatrix::try_from_rows(3, vec![vec![2]]).unwrap())
                 .unwrap();
         assert_eq!(identity.systematic_to_original, [0, 1, 2]);
-        assert_eq!(identity.original_to_systematic, [0, 1, 2]);
+        assert_mapping_is_permutation(&identity);
     }
 
-    fn assert_permutations_are_inverse(encoder: &SystematicEncoder) {
-        for (systematic, &original) in encoder.systematic_to_original.iter().enumerate() {
-            assert_eq!(encoder.original_to_systematic[original], systematic);
-        }
-        for (original, &systematic) in encoder.original_to_systematic.iter().enumerate() {
-            assert_eq!(encoder.systematic_to_original[systematic], original);
-        }
-    }
-
-    #[test]
-    fn buffer_size_helper_detects_byte_count_overflow() {
+    fn assert_mapping_is_permutation(encoder: &SystematicEncoder) {
+        let mut sorted_positions = encoder.systematic_to_original.clone();
+        sorted_positions.sort_unstable();
         assert_eq!(
-            super::check_buffer_size::<u64>(usize::MAX),
-            Err(LdpcError::SizeOverflow)
+            sorted_positions,
+            (0..encoder.codeword_len()).collect::<Vec<_>>()
         );
     }
 }

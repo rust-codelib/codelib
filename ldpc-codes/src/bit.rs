@@ -14,6 +14,30 @@ pub enum Bit {
     One,
 }
 
+pub(crate) fn bit_parity(bits: impl IntoIterator<Item = Bit>) -> Bit {
+    let is_odd = bits
+        .into_iter()
+        .fold(false, |parity, bit| parity ^ (bit == Bit::One));
+
+    if is_odd {
+        Bit::One
+    } else {
+        Bit::Zero
+    }
+}
+
+pub(crate) fn count_ones(bits: &[Bit]) -> usize {
+    bits.iter().filter(|&&bit| bit == Bit::One).count()
+}
+
+pub(crate) fn bit_distance(left: &[Bit], right: &[Bit]) -> usize {
+    debug_assert_eq!(left.len(), right.len());
+    left.iter()
+        .zip(right)
+        .filter(|(left, right)| left != right)
+        .count()
+}
+
 impl TryFrom<u8> for Bit {
     type Error = LdpcError;
 

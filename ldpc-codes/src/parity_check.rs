@@ -1,8 +1,9 @@
 //! Проверочная матрица двоичного LDPC-кода в разреженном виде.
 
-use core::mem::size_of;
 use gf_linalg::MAX_MATRIX_DIM;
 
+use crate::bit::bit_parity;
+use crate::size::check_buffer_bytes;
 use crate::{Bit, LdpcError};
 
 /// Проверочная матрица `H`, хранящая только позиции единиц по строкам.
@@ -72,11 +73,8 @@ impl ParityCheckMatrix {
         }
 
         // Проверяем размеры выделяемых буферов до построения обратных списков.
-        bits.checked_mul(size_of::<Vec<usize>>())
-            .ok_or(LdpcError::SizeOverflow)?;
-        edge_count
-            .checked_mul(size_of::<usize>())
-            .ok_or(LdpcError::SizeOverflow)?;
+        check_buffer_bytes::<Vec<usize>>(bits)?;
+        check_buffer_bytes::<usize>(edge_count)?;
         let mut bit_checks = Vec::with_capacity(bits);
         bit_checks.resize_with(bits, Vec::new);
         for (check, row) in rows.iter().enumerate() {
@@ -150,15 +148,7 @@ impl ParityCheckMatrix {
         Ok(self
             .check_bits
             .iter()
-            .map(|bits| {
-                bits.iter().fold(Bit::Zero, |parity, &bit| match word[bit] {
-                    Bit::Zero => parity,
-                    Bit::One => match parity {
-                        Bit::Zero => Bit::One,
-                        Bit::One => Bit::Zero,
-                    },
-                })
-            })
+            .map(|bits| bit_parity(bits.iter().map(|&bit| word[bit])))
             .collect())
     }
 

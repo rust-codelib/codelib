@@ -1,5 +1,6 @@
 //! Диагностика различий между двоичными последовательностями.
 
+use crate::bit::bit_distance;
 use crate::{Bit, LdpcError};
 
 /// Считает число различающихся позиций в слове и эталоне.
@@ -27,9 +28,5 @@ pub fn count_bit_errors(word: &[Bit], reference: &[Bit]) -> Result<usize, LdpcEr
         });
     }
 
-    Ok(word
-        .iter()
-        .zip(reference)
-        .filter(|(bit, reference_bit)| bit != reference_bit)
-        .count())
+    Ok(bit_distance(word, reference))
 }

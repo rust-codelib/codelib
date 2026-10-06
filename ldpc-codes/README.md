@@ -17,7 +17,7 @@ ldpc-codes = { path = "../codelib/ldpc-codes" }
 
 ```rust
 use ldpc_codes::{
-    Bit, DecodeInput, DecodeStatus, Decoder, DecoderConfig, Encoder, LdpcConfigurator,
+    Bit, DecodeInput, DecodeStatus, DecoderConfig, Encoder, LdpcConfigurator,
     LdpcError, ParityCheckMatrix,
 };
 
@@ -28,7 +28,7 @@ fn main() -> Result<(), LdpcError> {
     let message = [Bit::One];
     let encoded = code.encoder().encode(&message)?;
     let llrs = [-2.0, 1.0, -3.0];
-    let result = code.decoder_mut().decode(
+    let result = code.decode(
         DecodeInput { llrs: &llrs, erasures: &[] },
         None,
     )?;
@@ -41,7 +41,7 @@ fn main() -> Result<(), LdpcError> {
 }
 ```
 
-Методы `encode` и `extract_message` заданы трейтом [`Encoder`], а `decode` — трейтом [`Decoder`], поэтому трейты импортированы в пример. `?` возвращает вызывающему коду ошибку из `Result`, если операция не удалась.
+Методы `encode` и `extract_message` заданы трейтом [`Encoder`]. Пара `ConfiguredLdpc` предоставляет собственный `decode`, чтобы её внутренний декодер оставался согласован с кодером. `?` возвращает вызывающему коду ошибку из `Result`, если операция не удалась.
 
 ## Операции
 
@@ -50,7 +50,7 @@ fn main() -> Result<(), LdpcError> {
 | Создать бит и преобразовать биты в [`gf_linalg::Vector`] над [`Gf2`] | [`Bit`], [`bits_to_vector`], [`vector_to_bits`] |
 | Создать `H`, получить смежности и вычислить синдром | `ParityCheckMatrix::try_from_rows`, `ParityCheckMatrix::check_bits`, `ParityCheckMatrix::bit_checks`, `ParityCheckMatrix::syndrome`, `ParityCheckMatrix::is_codeword` |
 | Кодировать и извлекать сообщение | `Encoder::encode`, `Encoder::extract_message`, `SystematicEncoder::information_positions` |
-| Создать согласованные кодер и декодер | `LdpcConfigurator::build`, `ConfiguredLdpc::encoder`, `ConfiguredLdpc::decoder_mut` |
+| Создать согласованные кодер и декодер | `LdpcConfigurator::build`, `ConfiguredLdpc::encoder`, `ConfiguredLdpc::decode` |
 | Декодировать блок или выполнить один flooding-шаг | `Decoder::decode`, `spa_step` |
 | Получить статус, счётчики и события | [`DecodeResult`], [`DecodeStatus`], [`DecodeObserver`], [`DecodeEvent`] |
 | Сравнить результат с известным эталоном | [`count_bit_errors`] |
@@ -73,7 +73,7 @@ fn main() -> Result<(), LdpcError> {
 
 [`bits_to_vector`] и [`vector_to_bits`] преобразуют биты в [`gf_linalg::Vector<Gf2>`] и обратно, сохраняя порядок, длину и хвостовые нули. `Gf2` — псевдоним `gfpm::Gf<2, 1, 1>`. Сообщение кодера — блок из `k = n - rank(H)` битов; `message[j]` помещается в `word[information_positions()[j]]`, и информационные позиции не обязательно идут первыми. Предел 4096 байт из требований относится к будущему байтовому слою: здесь API не упаковывает биты и не разбивает длинное сообщение на блоки.
 
-[`DecodeResult`] предоставляет `word()`, `posterior_llrs()`, `syndrome()`, `status()`, `iterations()`, `initial_unsatisfied_checks()` и `final_unsatisfied_checks()`. `changed_bits()` считает отличия от начального жёсткого решения после насыщения LLR и применения стираний; это не число исправленных ошибок. [`count_bit_errors`] требует равные длины: кодовое слово длины `n` сравнивают с эталонным словом, а сообщение длины `k` — с эталонным сообщением. Декодер обычно эталона не знает.
+[`DecodeResult`] предоставляет `word()`, `posterior_llrs()`, `syndrome()`, `status()`, `iterations()`, `initial_unsatisfied_checks()` и `final_unsatisfied_checks()`. `changed_bits()` считает отличия от начального жёсткого решения; это не число исправленных ошибок. Для собственного `impl Decoder` результат создаётся через `DecodeResult::try_new(&checks, initial_word, posterior_llrs, status, iterations, iteration_limit)`: итоговое слово выводится из знаков LLR, а синдром и счётчики вычисляются по `H`. Конструктор проверяет формы, конечность LLR, статус и бюджет итераций, но не может подтвердить историю внешнего алгоритма — например, соответствие `initial_word` канальным значениям или факт выполнения каждой заявленной итерации. [`count_bit_errors`] требует равные длины: кодовое слово длины `n` сравнивают с эталонным словом, а сообщение длины `k` — с эталонным сообщением. Декодер обычно эталона не знает.
 
 События [`DecodeEvent`] приходят синхронно через [`DecodeObserver`]: начало, завершённая итерация и остановка. Передайте `Some(&mut observer)` в `decode`; `None` отключает события. При ошибке входа события не отправляются.
 

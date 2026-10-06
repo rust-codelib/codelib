@@ -1,5 +1,9 @@
 use super::*;
 use crate::{Bit, DecodeInput, DecodeStatus, DecoderConfig, LdpcError, ParityCheckMatrix};
+use proptest::prelude::*;
+
+const GENERATED_SPA_ABSOLUTE_TOLERANCE: f64 = 2e-9;
+const GENERATED_SPA_RELATIVE_TOLERANCE: f64 = 2e-10;
 
 /// Медленный тестовый эталон: для каждого сообщения перебирает всех соседей,
 /// кроме получателя, и использует `atanh` вместо промышленного преобразования.
@@ -191,6 +195,24 @@ fn sparse_checks_from_dense(matrix: &[Vec<bool>]) -> ParityCheckMatrix {
     .expect("dense fixture is a valid parity-check matrix")
 }
 
+fn generated_reference_case() -> impl Strategy<Value = (Vec<Vec<bool>>, Vec<f64>, usize)> {
+    (1usize..=5, 1usize..=7).prop_flat_map(|(check_count, bit_count)| {
+        (
+            prop::collection::vec(any::<bool>(), check_count * bit_count),
+            prop::collection::vec(-100i16..=100, bit_count),
+            1usize..=2,
+        )
+            .prop_map(move |(entries, llr_tenths, steps)| {
+                let dense_h = entries.chunks(bit_count).map(|row| row.to_vec()).collect();
+                let llrs = llr_tenths
+                    .into_iter()
+                    .map(|value| f64::from(value) / 10.0)
+                    .collect();
+                (dense_h, llrs, steps)
+            })
+    })
+}
+
 #[test]
 fn direct_neighbor_reference_matches_two_steps_on_a_mixed_small_graph() {
     let checks = ParityCheckMatrix::try_from_rows(
@@ -249,6 +271,35 @@ fn direct_neighbor_reference_matches_two_steps_on_a_mixed_small_graph() {
     state.step(config);
     reference.step();
     assert_state_matches_reference(&state, &reference, "after step 2");
+}
+
+proptest! {
+    #[test]
+    fn generated_one_or_two_spa_steps_match_the_direct_reference(
+        (dense_h, llrs, steps) in generated_reference_case()
+    ) {
+        let checks = sparse_checks_from_dense(&dense_h);
+        // Keep |tanh(q / 2)| bounded away from 1: q messages are clipped to this
+        // limit, and atanh magnifies rounding differences as their product nears 1.
+        let config = DecoderConfig::try_new(2, 5.0).expect("the generated-test limit is valid");
+        let input = DecodeInput { llrs: &llrs, erasures: &[] };
+        let mut state = SpaState::try_new(&checks).expect("small graph workspace is representable");
+        state.prepare_block(input, config).expect("generated LLRs are finite and correctly sized");
+        let mut reference = DirectReference::new(&checks, input, config);
+
+        assert_state_matches_reference(&state, &reference, "generated case before SPA");
+        for step in 1..=steps {
+            state.step(config);
+            reference.step();
+
+            assert_generated_state_matches_reference(
+                &state,
+                &reference,
+                &dense_h,
+                &format!("generated case after SPA step {step}"),
+            );
+        }
+    }
 }
 
 #[test]
@@ -347,7 +398,7 @@ fn llr_lengths_cover_empty_short_and_long_inputs() {
     for actual in [0, 2, 4] {
         let llrs = vec![0.0; actual];
         assert_eq!(
-            prepare_channel(
+            prepared_channel(
                 DecodeInput {
                     llrs: &llrs,
                     erasures: &[],
@@ -368,7 +419,7 @@ fn every_non_finite_value_is_rejected_even_at_an_erased_position() {
     let checks = ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1]]).expect("valid matrix");
     for bad_llr in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         let llrs = [1.0, bad_llr, 2.0];
-        let error = prepare_channel(
+        let error = prepared_channel(
             DecodeInput {
                 llrs: &llrs,
                 erasures: &[1],
@@ -382,7 +433,7 @@ fn every_non_finite_value_is_rejected_even_at_an_erased_position() {
 
     let llrs = [f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
     assert_eq!(
-        prepare_channel(
+        prepared_channel(
             DecodeInput {
                 llrs: &llrs,
                 erasures: &[0, 1, 2],
@@ -400,7 +451,7 @@ fn erasure_bounds_and_first_error_follow_input_order() {
     let llrs = [0.0; 3];
     for bit in [3, usize::MAX] {
         assert_eq!(
-            prepare_channel(
+            prepared_channel(
                 DecodeInput {
                     llrs: &llrs,
                     erasures: &[1, bit],
@@ -412,7 +463,7 @@ fn erasure_bounds_and_first_error_follow_input_order() {
         );
     }
     assert_eq!(
-        prepare_channel(
+        prepared_channel(
             DecodeInput {
                 llrs: &llrs,
                 erasures: &[2, 1, 2, 1],
@@ -455,7 +506,7 @@ fn erasure_order_is_irrelevant_and_all_erased_bits_start_at_zero() {
     reverse.step(config);
     assert_eq!(forward.snapshot(), reverse.snapshot());
 
-    let all_erased = prepare_channel(
+    let all_erased = prepared_channel(
         DecodeInput {
             llrs: &llrs,
             erasures: &[3, 1, 0, 2],
@@ -637,6 +688,100 @@ fn assert_state_matches_reference(state: &SpaState, reference: &DirectReference,
         &format!("{phase}: posterior"),
     );
     assert_eq!(state.word, reference.word, "{phase}: hard decisions");
+}
+
+fn assert_generated_state_matches_reference(
+    state: &SpaState,
+    reference: &DirectReference,
+    dense_h: &[Vec<bool>],
+    phase: &str,
+) {
+    assert_generated_float_slices_close(
+        &reference.channel,
+        &state.channel,
+        &format!("{phase}: channel"),
+    );
+    assert_generated_float_slices_close(&reference.q, &state.q, &format!("{phase}: q"));
+    assert_generated_float_slices_close(&reference.r, &state.r, &format!("{phase}: r"));
+    assert_generated_float_slices_close(
+        &reference.posterior,
+        &state.posterior,
+        &format!("{phase}: posterior"),
+    );
+
+    let state_syndrome = dense_syndrome(dense_h, &state.word);
+    let reference_syndrome = dense_syndrome(dense_h, &reference.word);
+    let mut spa_syndrome = vec![Bit::Zero; state_syndrome.len()];
+    state.fill_syndrome(&mut spa_syndrome);
+    assert_eq!(spa_syndrome, state_syndrome, "{phase}: dense SPA syndrome");
+
+    for (bit, (&state_llr, &reference_llr)) in
+        state.posterior.iter().zip(&reference.posterior).enumerate()
+    {
+        assert_eq!(
+            state.word[bit],
+            hard_decision(state_llr),
+            "{phase}: SPA hard-decision rule at bit {bit}"
+        );
+        assert_eq!(
+            reference.word[bit],
+            hard_decision(reference_llr),
+            "{phase}: reference hard-decision rule at bit {bit}"
+        );
+
+        if hard_decision_is_unambiguous(state_llr, reference_llr) {
+            assert_eq!(
+                state.word[bit], reference.word[bit],
+                "{phase}: unambiguous hard decision at bit {bit}"
+            );
+        }
+    }
+
+    // Numerically equivalent updates may round to opposite sides of zero. Compare
+    // the dense syndrome between implementations only when every bit in that
+    // check has an unambiguous hard decision; the SPA syndrome above is checked
+    // against dense H for every row, including checks containing ambiguous bits.
+    for (check, row) in dense_h.iter().enumerate() {
+        let check_is_unambiguous = row.iter().enumerate().all(|(bit, &present)| {
+            !present || hard_decision_is_unambiguous(state.posterior[bit], reference.posterior[bit])
+        });
+        if check_is_unambiguous {
+            assert_eq!(
+                state_syndrome[check], reference_syndrome[check],
+                "{phase}: unambiguous dense syndrome for check {check}"
+            );
+        }
+    }
+}
+
+fn hard_decision(llr: f64) -> Bit {
+    if llr >= 0.0 {
+        Bit::Zero
+    } else {
+        Bit::One
+    }
+}
+
+fn hard_decision_is_unambiguous(actual: f64, reference: f64) -> bool {
+    let tolerance =
+        GENERATED_SPA_ABSOLUTE_TOLERANCE + GENERATED_SPA_RELATIVE_TOLERANCE * reference.abs();
+    actual.abs() > tolerance && reference.abs() > tolerance
+}
+
+fn assert_generated_float_slices_close(expected: &[f64], actual: &[f64], phase: &str) {
+    assert_eq!(actual.len(), expected.len(), "{phase}: length");
+    for (index, (&expected, &actual)) in expected.iter().zip(actual).enumerate() {
+        assert!(
+            actual.is_finite(),
+            "{phase}[{index}] is not finite: {actual}"
+        );
+        let tolerance =
+            GENERATED_SPA_ABSOLUTE_TOLERANCE + GENERATED_SPA_RELATIVE_TOLERANCE * expected.abs();
+        assert!(
+            (expected - actual).abs() <= tolerance,
+            "{phase}[{index}]: expected {expected}, got {actual}, tolerance {tolerance}"
+        );
+    }
 }
 
 fn assert_float_slices_close(expected: &[f64], actual: &[f64], phase: &str) {

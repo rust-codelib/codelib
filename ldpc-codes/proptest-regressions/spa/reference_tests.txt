@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 250962b4817dada8cbabad0da9c358528db458d52c9797ccd7c8ffd67c782220 # shrinks to (dense_h, llrs, steps) = ([[true, true, false], [true, false, true]], [5.2, -5.4, 0.2], 2)
+cc 9978f722763dcd64074ddee1220808e08c43e219768921939ba7cf764dc60db2 # shrinks to (dense_h, llrs, steps) = ([[false, true, false, true], [true, false, true, true], [true, true, true, true]], [-7.9, -1.5, 8.5, -8.6], 2)
+cc fb0b186e1194f38380fd66ec69c0ecd298c0f879c0dfab29be57056d923536d4 # shrinks to (dense_h, llrs, steps) = ([[true, true, true, false], [true, true, false, true], [true, true, false, true], [true, true, false, true]], [-3.6, 8.1, 0.0, -7.3], 2)

@@ -1,6 +1,6 @@
 use ldpc_codes::{
     bits_to_vector, count_bit_errors, vector_to_bits, Bit, ConfiguredLdpc, DecodeInput,
-    DecodeStatus, Decoder, DecoderConfig, Encoder, LdpcConfigurator, ParityCheckMatrix,
+    DecodeStatus, DecoderConfig, Encoder, LdpcConfigurator, ParityCheckMatrix,
 };
 use proptest::prelude::*;
 
@@ -79,6 +79,23 @@ fn codec_case_strategy() -> impl Strategy<Value = CodecCase> {
                 first_message: first.into_iter().map(bit_from_bool).collect(),
                 second_message: second.into_iter().map(bit_from_bool).collect(),
             })
+    })
+}
+
+fn permuted_codec_case_strategy() -> impl Strategy<Value = (CodecCase, Vec<usize>)> {
+    codec_case_strategy().prop_flat_map(|case| {
+        let columns = case.dense_checks[0].len();
+        let order = prop::collection::vec(any::<u32>(), columns..=columns).prop_map(move |keys| {
+            let mut order: Vec<_> = (0..columns).collect();
+            order.sort_by_key(|&column| (keys[column], column));
+
+            // Move the known all-zero column away from its original final position.
+            if order[columns - 1] == columns - 1 {
+                order.swap(columns - 1, 0);
+            }
+            order
+        });
+        (Just(case), order)
     })
 }
 
@@ -175,7 +192,6 @@ fn assert_noiseless_block(
 
     let llrs = strong_llrs(&codeword);
     let result = configured
-        .decoder_mut()
         .decode(
             DecodeInput {
                 llrs: &llrs,
@@ -284,5 +300,47 @@ proptest! {
 
         // Also exercise the independently generated message in this same decoder instance.
         assert_noiseless_block(&mut configured, &case.dense_checks, &case.second_message);
+    }
+}
+
+proptest! {
+    #[test]
+    fn generated_column_permutations_preserve_codeword_positions_in_h_order(
+        (case, column_order) in permuted_codec_case_strategy()
+    ) {
+        let columns = case.dense_checks[0].len();
+        let permuted_checks: Vec<Vec<u8>> = case.dense_checks
+            .iter()
+            .map(|row| column_order.iter().map(|&old_column| row[old_column]).collect())
+            .collect();
+        let isolated_position = column_order
+            .iter()
+            .position(|&old_column| old_column == columns - 1)
+            .expect("the generated column order contains each column once");
+
+        prop_assert_eq!(column_order.len(), columns);
+        prop_assert_ne!(isolated_position, columns - 1);
+
+        let checks = checks_from_dense(&permuted_checks);
+        let configured = LdpcConfigurator::build(checks, DecoderConfig::default())
+            .expect("column permutation preserves the generated rank");
+        let encoder = configured.encoder();
+        prop_assert_eq!(encoder.rank(), case.rank);
+        prop_assert!(encoder.information_positions().contains(&isolated_position));
+
+        let message = &case.first_message;
+        let codeword = encoder.encode(message).expect("message length matches the code");
+        prop_assert_eq!(codeword.len(), columns);
+        prop_assert_eq!(
+            dense_xor_syndrome(&permuted_checks, &codeword),
+            vec![0; permuted_checks.len()]
+        );
+        for (&position, &bit) in encoder.information_positions().iter().zip(message) {
+            prop_assert_eq!(codeword[position], bit);
+        }
+        prop_assert_eq!(
+            encoder.extract_message(&codeword),
+            Ok(message.clone())
+        );
     }
 }

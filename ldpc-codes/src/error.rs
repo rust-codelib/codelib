@@ -73,6 +73,17 @@ pub enum LdpcError {
         /// Повторяющийся индекс бита.
         bit: usize,
     },
+    /// Число итераций результата не согласуется с объявленным пределом.
+    DecodeIterationsExceedLimit {
+        /// Число полностью выполненных итераций.
+        iterations: usize,
+        /// Максимально допустимое число итераций.
+        limit: usize,
+    },
+    /// Статус результата не согласуется с синдромом или числом итераций.
+    DecodeResultStatusMismatch,
+    /// При нуле итераций итоговое жёсткое решение отличается от начального.
+    DecodeResultZeroIterationsMismatch,
     /// Ранг проверочной матрицы не позволяет построить систематический кодер.
     InvalidEncoderRank {
         /// Ранг проверочной матрицы.
@@ -152,6 +163,18 @@ impl fmt::Display for LdpcError {
             Self::DuplicateErasureIndex { bit } => {
                 write!(f, "индекс стирания {bit} указан повторно")
             }
+            Self::DecodeIterationsExceedLimit { iterations, limit } => write!(
+                f,
+                "число итераций результата {iterations} превышает объявленный предел {limit}"
+            ),
+            Self::DecodeResultStatusMismatch => write!(
+                f,
+                "статус результата не согласуется с синдромом или числом итераций"
+            ),
+            Self::DecodeResultZeroIterationsMismatch => write!(
+                f,
+                "при нуле итераций итоговое слово должно совпадать с начальным решением"
+            ),
             Self::InvalidEncoderRank { rank, cols } => write!(
                 f,
                 "недопустимый ранг {rank} для систематического кодера с {cols} столбцами"
