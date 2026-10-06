@@ -47,6 +47,13 @@ pub enum LdpcError {
         /// Фактическое число битов во входном слове.
         actual: usize,
     },
+    /// Ранг проверочной матрицы не позволяет построить систематический кодер.
+    InvalidEncoderRank {
+        /// Ранг проверочной матрицы.
+        rank: usize,
+        /// Число столбцов проверочной матрицы.
+        cols: usize,
+    },
     /// Размер внутреннего хранилища не представим типом `usize`.
     SizeOverflow,
     /// Операция плотной линейной алгебры завершилась ошибкой.
@@ -82,6 +89,10 @@ impl fmt::Display for LdpcError {
             Self::WordLengthMismatch { expected, actual } => write!(
                 f,
                 "длина слова {actual} не совпадает с ожидаемой длиной {expected}"
+            ),
+            Self::InvalidEncoderRank { rank, cols } => write!(
+                f,
+                "недопустимый ранг {rank} для систематического кодера с {cols} столбцами"
             ),
             Self::SizeOverflow => write!(f, "переполнение размера внутреннего хранилища"),
             Self::LinearAlgebra { source } => write!(f, "ошибка линейной алгебры: {source}"),

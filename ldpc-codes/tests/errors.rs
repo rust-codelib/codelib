@@ -26,3 +26,14 @@ fn errors_without_wrapped_causes_have_no_source() {
 
     assert!(error.source().is_none());
 }
+
+#[test]
+fn invalid_encoder_rank_has_diagnostic_and_no_wrapped_cause() {
+    let error = LdpcError::InvalidEncoderRank { rank: 2, cols: 2 };
+
+    assert_eq!(
+        error.to_string(),
+        "недопустимый ранг 2 для систематического кодера с 2 столбцами"
+    );
+    assert!(error.source().is_none());
+}
