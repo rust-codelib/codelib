@@ -14,7 +14,7 @@ pub use coefficients::MAX_POLYNOMIAL_BYTES;
 pub use error::LinalgError;
 pub use field::FieldElement;
 pub use field_text::FieldText;
-pub use matrix::Matrix;
+pub use matrix::{Matrix, RrefResult};
 pub use vector::Vector;
 
 /// Максимальный размер каждой оси матрицы.
