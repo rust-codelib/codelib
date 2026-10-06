@@ -6,7 +6,10 @@
 use core::mem::size_of;
 
 use crate::decode_input::prepare_channel;
-use crate::{Bit, DecodeInput, DecoderConfig, LdpcError, ParityCheckMatrix};
+use crate::{
+    Bit, DecodeEvent, DecodeInput, DecodeObserver, DecodeResult, DecodeStatus, Decoder,
+    DecoderConfig, LdpcError, ParityCheckMatrix,
+};
 
 #[derive(Debug, PartialEq, Eq)]
 struct SparseGraph {
@@ -179,6 +182,18 @@ impl SpaState {
         self.update_bit_messages(config);
     }
 
+    fn fill_syndrome(&self, syndrome: &mut [Bit]) {
+        debug_assert_eq!(syndrome.len(), self.graph.check_edges.len());
+        for (check, edges) in self.graph.check_edges.iter().enumerate() {
+            let mut parity = false;
+            for &edge in edges {
+                let bit = self.graph.edge_bits[edge];
+                parity ^= self.word[bit] == Bit::One;
+            }
+            syndrome[check] = if parity { Bit::One } else { Bit::Zero };
+        }
+    }
+
     fn into_result(self) -> SpaStepResult {
         SpaStepResult {
             word: self.word,
@@ -229,6 +244,117 @@ impl SpaStepResult {
     pub fn posterior_llrs(&self) -> &[f64] {
         &self.posterior_llrs
     }
+}
+
+/// Переиспользуемый декодер по алгоритму sum-product (SPA).
+#[derive(Debug)]
+pub struct SpaDecoder {
+    state: SpaState,
+    config: DecoderConfig,
+}
+
+impl SpaDecoder {
+    /// Создаёт SPA-декодер по исходной проверочной матрице и конфигурации.
+    ///
+    /// Любая допустимая матрица подходит для декодирования, включая матрицу
+    /// нулевого или полного ранга. Граф связей и рабочие буферы создаются один
+    /// раз и повторно используются для последующих блоков.
+    ///
+    /// # Ошибки
+    ///
+    /// Возвращает [`LdpcError::SizeOverflow`], если размер внутреннего графа или
+    /// рабочих буферов нельзя представить типом `usize`.
+    pub fn try_new(checks: ParityCheckMatrix, config: DecoderConfig) -> Result<Self, LdpcError> {
+        let state = SpaState::try_new(&checks)?;
+        Ok(Self { state, config })
+    }
+}
+
+impl Decoder for SpaDecoder {
+    fn codeword_len(&self) -> usize {
+        self.state.graph.bit_edges.len()
+    }
+
+    fn decode(
+        &mut self,
+        input: DecodeInput<'_>,
+        observer: Option<&mut dyn DecodeObserver>,
+    ) -> Result<DecodeResult, LdpcError> {
+        self.state.prepare_block(input, self.config)?;
+
+        let mut observer = observer;
+        let mut syndrome = vec![Bit::Zero; self.state.graph.check_edges.len()];
+        self.state.fill_syndrome(&mut syndrome);
+        let initial_unsatisfied_checks = count_unsatisfied_checks(&syndrome);
+        let initial_word = self.state.word.clone();
+        let started = DecodeEvent::Started {
+            unsatisfied_checks: initial_unsatisfied_checks,
+        };
+        if let Some(observer) = observer.as_mut() {
+            (**observer).on_event(&started);
+        }
+
+        let mut iterations = 0;
+        let mut status = (initial_unsatisfied_checks == 0).then_some(DecodeStatus::ParitySatisfied);
+
+        while status.is_none() && iterations < self.config.max_iterations() {
+            self.state.step(self.config);
+            iterations += 1;
+            self.state.fill_syndrome(&mut syndrome);
+
+            let unsatisfied_checks = count_unsatisfied_checks(&syndrome);
+            let changed_bits = count_changed_bits(&initial_word, &self.state.word);
+            let event = DecodeEvent::IterationFinished {
+                iteration: iterations,
+                unsatisfied_checks,
+                changed_bits,
+            };
+            if let Some(observer) = observer.as_mut() {
+                (**observer).on_event(&event);
+            }
+
+            if unsatisfied_checks == 0 {
+                status = Some(DecodeStatus::ParitySatisfied);
+            }
+        }
+
+        let status = status.unwrap_or(DecodeStatus::IterationLimit);
+        let final_unsatisfied_checks = count_unsatisfied_checks(&syndrome);
+        let changed_bits = count_changed_bits(&initial_word, &self.state.word);
+        let finished = DecodeEvent::Finished {
+            iterations,
+            status,
+            unsatisfied_checks: final_unsatisfied_checks,
+            changed_bits,
+        };
+        if let Some(observer) = observer.as_mut() {
+            (**observer).on_event(&finished);
+        }
+
+        Ok(DecodeResult {
+            word: self.state.word.clone(),
+            posterior_llrs: self.state.posterior.clone(),
+            syndrome,
+            status,
+            iterations,
+            changed_bits,
+            initial_unsatisfied_checks,
+            final_unsatisfied_checks,
+        })
+    }
+}
+
+fn count_unsatisfied_checks(syndrome: &[Bit]) -> usize {
+    syndrome.iter().filter(|&&bit| bit == Bit::One).count()
+}
+
+fn count_changed_bits(initial: &[Bit], current: &[Bit]) -> usize {
+    debug_assert_eq!(initial.len(), current.len());
+    initial
+        .iter()
+        .zip(current)
+        .filter(|(initial, current)| initial != current)
+        .count()
 }
 
 /// Выполняет ровно один flooding-шаг SPA по разреженной проверочной матрице.
@@ -319,6 +445,7 @@ fn checked_workspace_sizes(checks: &ParityCheckMatrix) -> Result<WorkspaceSizes,
     checked_vec_bytes::<Vec<usize>>(bit_count)?;
     checked_vec_bytes::<usize>(edge_count)?;
     // Каждый массив указанного типа и длины имеет один и тот же размер в байтах.
+    checked_vec_bytes::<Bit>(check_count)?;
     checked_vec_bytes::<f64>(bit_count)?;
     checked_vec_bytes::<Bit>(bit_count)?;
     checked_vec_bytes::<f64>(edge_count)?;

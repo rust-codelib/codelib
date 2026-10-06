@@ -5,6 +5,7 @@
 mod bit;
 mod conversion;
 mod decode_input;
+mod decoder;
 mod decoder_config;
 mod encoder;
 mod error;
@@ -14,8 +15,9 @@ mod spa;
 pub use bit::Bit;
 pub use conversion::{bits_to_vector, vector_to_bits, Gf2};
 pub use decode_input::DecodeInput;
+pub use decoder::{DecodeEvent, DecodeObserver, DecodeResult, DecodeStatus, Decoder};
 pub use decoder_config::DecoderConfig;
 pub use encoder::{Encoder, SystematicEncoder};
 pub use error::LdpcError;
 pub use parity_check::ParityCheckMatrix;
-pub use spa::{spa_step, SpaStepResult};
+pub use spa::{spa_step, SpaDecoder, SpaStepResult};
