@@ -87,6 +87,13 @@ pub enum LdpcError {
         /// Фактическое число битов во входном сообщении.
         actual: usize,
     },
+    /// Длины слова и эталона для сравнения битовых ошибок различаются.
+    ReferenceLengthMismatch {
+        /// Ожидаемая длина слова.
+        expected: usize,
+        /// Фактическая длина эталона.
+        actual: usize,
+    },
     /// Слово правильной длины нарушает проверки исходной матрицы.
     InvalidCodeword {
         /// Число нарушенных строк исходной проверочной матрицы.
@@ -152,6 +159,10 @@ impl fmt::Display for LdpcError {
             Self::MessageLengthMismatch { expected, actual } => write!(
                 f,
                 "длина сообщения {actual} не совпадает с ожидаемой длиной {expected}"
+            ),
+            Self::ReferenceLengthMismatch { expected, actual } => write!(
+                f,
+                "длина эталона {actual} не совпадает с ожидаемой длиной слова {expected}"
             ),
             Self::InvalidCodeword { unsatisfied_checks } => {
                 write!(f, "кодовое слово нарушает {unsatisfied_checks} проверки")
