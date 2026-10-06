@@ -102,10 +102,10 @@ impl<F: FieldText> FromStr for Vector<F> {
             return Err(LinalgError::InvalidTextHeader { expected: "vector" });
         }
 
-        let dimension = tokens
+        let length_token = tokens
             .next()
             .ok_or(LinalgError::InvalidTextDimension { token_index: 1 })?;
-        let length = parse_ascii_usize(dimension, 1)?;
+        let length = parse_ascii_usize(length_token, 1)?;
 
         // Count before allocating the element buffer. In particular, a short
         // input declaring usize::MAX fails here without attempting that size.

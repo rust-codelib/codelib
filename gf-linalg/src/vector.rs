@@ -3,7 +3,7 @@
 use gf2m::Gf256;
 use std::ops::{Add, Mul, Sub};
 
-use crate::FieldElement;
+use crate::{FieldElement, LinalgError};
 
 /// Вектор элементов поля `F`, сохраняющий их порядок и хвостовые нули.
 ///
@@ -119,9 +119,9 @@ impl<F: FieldElement> Vector<F> {
     /// Возвращает ошибку с обеими длинами, если они различаются. При успехе
     /// создаётся новый вектор той же длины; исходные векторы не изменяются,
     /// включая нулевые элементы в конце.
-    pub fn try_add(&self, rhs: &Self) -> Result<Self, crate::LinalgError> {
+    pub fn try_add(&self, rhs: &Self) -> Result<Self, LinalgError> {
         if self.len() != rhs.len() {
-            return Err(crate::LinalgError::VectorLengthMismatch {
+            return Err(LinalgError::VectorLengthMismatch {
                 left: self.len(),
                 right: rhs.len(),
             });
@@ -142,9 +142,9 @@ impl<F: FieldElement> Vector<F> {
     /// При несовпадении длин возвращает ошибку с длинами в порядке операндов.
     /// При успехе создаёт новый вектор той же длины; исходные векторы не
     /// изменяются, включая нулевые элементы в конце.
-    pub fn try_sub(&self, rhs: &Self) -> Result<Self, crate::LinalgError> {
+    pub fn try_sub(&self, rhs: &Self) -> Result<Self, LinalgError> {
         if self.len() != rhs.len() {
-            return Err(crate::LinalgError::VectorLengthMismatch {
+            return Err(LinalgError::VectorLengthMismatch {
                 left: self.len(),
                 right: rhs.len(),
             });
@@ -174,8 +174,8 @@ impl<F: FieldElement> Vector<F> {
     /// На этом этапе каждый вызов возвращает [`crate::LinalgError::NotImplemented`],
     /// в том числе для пустых векторов и векторов разной длины. Ни фиктивное
     /// значение, ни частичный результат не вычисляются.
-    pub fn try_dot(&self, _rhs: &Self) -> Result<F, crate::LinalgError> {
-        Err(crate::LinalgError::NotImplemented {
+    pub fn try_dot(&self, _rhs: &Self) -> Result<F, LinalgError> {
+        Err(LinalgError::NotImplemented {
             operation: "скалярное произведение векторов",
         })
     }
@@ -186,7 +186,7 @@ impl<F: FieldElement> Vector<F> {
 /// Оба вектора передаются оператору во владение; результат имеет тип
 /// `Result<Vector, LinalgError>`, поскольку длины могут различаться.
 impl<F: FieldElement> Add for Vector<F> {
-    type Output = Result<Vector<F>, crate::LinalgError>;
+    type Output = Result<Self, LinalgError>;
 
     fn add(self, rhs: Self) -> Self::Output {
         self.try_add(&rhs)
@@ -198,7 +198,7 @@ impl<F: FieldElement> Add for Vector<F> {
 /// Как и для owned-формы, результатом является `Result`, так как длины могут
 /// различаться.
 impl<F: FieldElement> Add<&Vector<F>> for &Vector<F> {
-    type Output = Result<Vector<F>, crate::LinalgError>;
+    type Output = Result<Vector<F>, LinalgError>;
 
     fn add(self, rhs: &Vector<F>) -> Self::Output {
         self.try_add(rhs)
@@ -210,7 +210,7 @@ impl<F: FieldElement> Add<&Vector<F>> for &Vector<F> {
 /// Оба вектора передаются оператору во владение; результатом является
 /// `Result<Vector<F>, LinalgError>`, поскольку длины могут различаться.
 impl<F: FieldElement> Sub for Vector<F> {
-    type Output = Result<Vector<F>, crate::LinalgError>;
+    type Output = Result<Self, LinalgError>;
 
     fn sub(self, rhs: Self) -> Self::Output {
         self.try_sub(&rhs)
@@ -222,7 +222,7 @@ impl<F: FieldElement> Sub for Vector<F> {
 /// Результатом `&left - &right` является `Result<Vector<F>, LinalgError>`;
 /// исходные векторы остаются доступными.
 impl<F: FieldElement> Sub<&Vector<F>> for &Vector<F> {
-    type Output = Result<Vector<F>, crate::LinalgError>;
+    type Output = Result<Vector<F>, LinalgError>;
 
     fn sub(self, rhs: &Vector<F>) -> Self::Output {
         self.try_sub(rhs)
@@ -231,7 +231,7 @@ impl<F: FieldElement> Sub<&Vector<F>> for &Vector<F> {
 
 /// Умножение принадлежащего операнду вектора на скаляр того же поля.
 impl<F: FieldElement> Mul<F> for Vector<F> {
-    type Output = Vector<F>;
+    type Output = Self;
 
     fn mul(self, rhs: F) -> Self::Output {
         self.scale(rhs)

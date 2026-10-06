@@ -121,7 +121,7 @@ impl<F: FieldElement> Matrix<F> {
     /// }
     /// ```
     pub fn rref(&self) -> RrefResult<F> {
-        let mut data = self.data.clone();
+        let mut reduced_data = self.data.clone();
         let mut pivot_columns = Vec::with_capacity(self.rows.min(self.cols));
         let mut pivot_row = 0;
 
@@ -130,32 +130,32 @@ impl<F: FieldElement> Matrix<F> {
                 break;
             }
 
-            let Some(found_row) = find_pivot_row(&data, self.cols, pivot_row, self.rows, pivot_col)
+            let Some(found_row) =
+                find_pivot_row(&reduced_data, self.cols, pivot_row, self.rows, pivot_col)
             else {
                 continue;
             };
 
             if found_row != pivot_row {
-                swap_rows(&mut data, self.cols, found_row, pivot_row);
+                swap_rows(&mut reduced_data, self.cols, found_row, pivot_row);
             }
 
             let pivot_offset = pivot_row * self.cols;
             let pivot_index = pivot_offset + pivot_col;
-            let pivot_inverse = data[pivot_index].inv();
-            scale_row(&mut data, self.cols, pivot_row, pivot_inverse);
+            let pivot_inverse = reduced_data[pivot_index].inv();
+            scale_row(&mut reduced_data, self.cols, pivot_row, pivot_inverse);
 
             for row in 0..self.rows {
                 if row == pivot_row {
                     continue;
                 }
 
-                let row_offset = row * self.cols;
-                let factor = data[row_offset + pivot_col];
+                let factor = reduced_data[row * self.cols + pivot_col];
                 if factor.is_zero() {
                     continue;
                 }
 
-                subtract_row_multiple(&mut data, self.cols, row, pivot_row, 0, factor);
+                subtract_row_multiple(&mut reduced_data, self.cols, row, pivot_row, 0, factor);
             }
 
             pivot_columns.push(pivot_col);
@@ -166,7 +166,7 @@ impl<F: FieldElement> Matrix<F> {
             matrix: Self {
                 rows: self.rows,
                 cols: self.cols,
-                data,
+                data: reduced_data,
             },
             pivot_columns,
         }
@@ -202,34 +202,42 @@ impl<F: FieldElement> Matrix<F> {
             });
         }
 
-        let n = self.rows;
-        let mut work = self.data.clone();
+        let size = self.rows;
+        let mut echelon_data = self.data.clone();
         let mut determinant = F::one();
 
-        for pivot_col in 0..n {
-            let Some(pivot_row) = find_pivot_row(&work, n, pivot_col, n, pivot_col) else {
+        for pivot_col in 0..size {
+            let Some(pivot_row) = find_pivot_row(&echelon_data, size, pivot_col, size, pivot_col)
+            else {
                 return Ok(F::zero());
             };
 
             if pivot_row != pivot_col {
                 determinant = -determinant;
-                swap_rows(&mut work, n, pivot_row, pivot_col);
+                swap_rows(&mut echelon_data, size, pivot_row, pivot_col);
             }
 
-            let pivot = work[pivot_col * n + pivot_col];
+            let pivot = echelon_data[pivot_col * size + pivot_col];
             determinant = determinant * pivot;
 
             // Pivot гарантированно ненулевой после поиска выше.
             let pivot_inverse = pivot.inv();
-            for row in pivot_col + 1..n {
-                let row_offset = row * n;
-                let factor = work[row_offset + pivot_col] * pivot_inverse;
+            for row in pivot_col + 1..size {
+                let row_offset = row * size;
+                let factor = echelon_data[row_offset + pivot_col] * pivot_inverse;
                 if factor.is_zero() {
                     continue;
                 }
 
-                subtract_row_multiple(&mut work, n, row, pivot_col, pivot_col + 1, factor);
-                work[row_offset + pivot_col] = F::zero();
+                subtract_row_multiple(
+                    &mut echelon_data,
+                    size,
+                    row,
+                    pivot_col,
+                    pivot_col + 1,
+                    factor,
+                );
+                echelon_data[row_offset + pivot_col] = F::zero();
             }
         }
 
@@ -290,50 +298,54 @@ impl<F: FieldElement> Matrix<F> {
             });
         }
 
-        let n = self.rows;
-        let element_count = n
-            .checked_mul(n)
-            .ok_or(LinalgError::InvalidDimensions { rows: n, cols: n })?;
+        let size = self.rows;
+        let element_count = size
+            .checked_mul(size)
+            .ok_or(LinalgError::InvalidDimensions {
+                rows: size,
+                cols: size,
+            })?;
 
-        let mut left = self.data.clone();
-        let mut right = vec![F::zero(); element_count];
-        for index in 0..n {
-            right[index * n + index] = F::one();
+        let mut reduced_data = self.data.clone();
+        let mut inverse_data = vec![F::zero(); element_count];
+        for index in 0..size {
+            inverse_data[index * size + index] = F::one();
         }
 
-        for pivot_col in 0..n {
-            let Some(pivot_row) = find_pivot_row(&left, n, pivot_col, n, pivot_col) else {
+        for pivot_col in 0..size {
+            let Some(pivot_row) = find_pivot_row(&reduced_data, size, pivot_col, size, pivot_col)
+            else {
                 return Err(LinalgError::SingularMatrix);
             };
 
             if pivot_row != pivot_col {
-                swap_rows(&mut left, n, pivot_row, pivot_col);
-                swap_rows(&mut right, n, pivot_row, pivot_col);
+                swap_rows(&mut reduced_data, size, pivot_row, pivot_col);
+                swap_rows(&mut inverse_data, size, pivot_row, pivot_col);
             }
 
-            let pivot_inverse = left[pivot_col * n + pivot_col].inv();
-            scale_row(&mut left, n, pivot_col, pivot_inverse);
-            scale_row(&mut right, n, pivot_col, pivot_inverse);
+            let pivot_inverse = reduced_data[pivot_col * size + pivot_col].inv();
+            scale_row(&mut reduced_data, size, pivot_col, pivot_inverse);
+            scale_row(&mut inverse_data, size, pivot_col, pivot_inverse);
 
-            for row in 0..n {
+            for row in 0..size {
                 if row == pivot_col {
                     continue;
                 }
 
-                let factor = left[row * n + pivot_col];
+                let factor = reduced_data[row * size + pivot_col];
                 if factor.is_zero() {
                     continue;
                 }
 
-                subtract_row_multiple(&mut left, n, row, pivot_col, 0, factor);
-                subtract_row_multiple(&mut right, n, row, pivot_col, 0, factor);
+                subtract_row_multiple(&mut reduced_data, size, row, pivot_col, 0, factor);
+                subtract_row_multiple(&mut inverse_data, size, row, pivot_col, 0, factor);
             }
         }
 
         Ok(Self {
-            rows: n,
-            cols: n,
-            data: right,
+            rows: size,
+            cols: size,
+            data: inverse_data,
         })
     }
 }
