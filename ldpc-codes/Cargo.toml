@@ -11,6 +11,9 @@ description = "Библиотека для двоичных LDPC-кодов"
 gf-linalg = { path = "../gf-linalg", version = "0.1.0" }
 gfpm = { path = "../gfpm", version = "1.0.0" }
 
+[dev-dependencies]
+proptest.workspace = true
+
 [lib]
 name = "ldpc_codes"
 path = "src/lib.rs"
