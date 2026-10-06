@@ -59,3 +59,41 @@ fn invalid_codeword_reports_unsatisfied_checks_without_a_wrapped_cause() {
     assert!(error.to_string().contains("2 проверки"));
     assert!(error.source().is_none());
 }
+
+#[test]
+fn llr_length_mismatch_reports_expected_and_actual_lengths() {
+    let error = LdpcError::LlrLengthMismatch {
+        expected: 4,
+        actual: 3,
+    };
+
+    assert!(error.to_string().contains("LLR"));
+    assert!(error.to_string().contains("3"));
+    assert!(error.to_string().contains("4"));
+    assert!(error.source().is_none());
+}
+
+#[test]
+fn non_finite_llr_reports_its_index() {
+    let error = LdpcError::NonFiniteLlr { index: 2 };
+
+    assert!(error.to_string().contains("2"));
+    assert!(error.source().is_none());
+}
+
+#[test]
+fn out_of_bounds_erasure_reports_bit_and_word_length() {
+    let error = LdpcError::ErasureIndexOutOfBounds { bit: 5, bits: 4 };
+
+    assert!(error.to_string().contains("5"));
+    assert!(error.to_string().contains("4"));
+    assert!(error.source().is_none());
+}
+
+#[test]
+fn duplicate_erasure_reports_repeated_bit() {
+    let error = LdpcError::DuplicateErasureIndex { bit: 2 };
+
+    assert!(error.to_string().contains("2"));
+    assert!(error.source().is_none());
+}

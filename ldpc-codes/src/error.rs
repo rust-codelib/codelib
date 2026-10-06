@@ -49,6 +49,30 @@ pub enum LdpcError {
     },
     /// Предел LLR не является конечным числом из диапазона `(0, 20]`.
     InvalidLlrLimit,
+    /// Число LLR не совпадает с числом столбцов проверочной матрицы.
+    LlrLengthMismatch {
+        /// Ожидаемое число LLR.
+        expected: usize,
+        /// Фактическое число LLR во входном массиве.
+        actual: usize,
+    },
+    /// LLR с указанным индексом не является конечным числом.
+    NonFiniteLlr {
+        /// Индекс NaN или бесконечности во входном массиве.
+        index: usize,
+    },
+    /// Индекс стирания находится за пределами кодового слова.
+    ErasureIndexOutOfBounds {
+        /// Недопустимый индекс бита.
+        bit: usize,
+        /// Число битов в кодовом слове.
+        bits: usize,
+    },
+    /// Индекс стирания повторяется во входном списке.
+    DuplicateErasureIndex {
+        /// Повторяющийся индекс бита.
+        bit: usize,
+    },
     /// Ранг проверочной матрицы не позволяет построить систематический кодер.
     InvalidEncoderRank {
         /// Ранг проверочной матрицы.
@@ -108,6 +132,19 @@ impl fmt::Display for LdpcError {
                 f,
                 "предел LLR должен быть конечным и находиться в диапазоне (0, 20]"
             ),
+            Self::LlrLengthMismatch { expected, actual } => write!(
+                f,
+                "число LLR {actual} не совпадает с ожидаемым числом {expected}"
+            ),
+            Self::NonFiniteLlr { index } => {
+                write!(f, "LLR с индексом {index} не является конечным числом")
+            }
+            Self::ErasureIndexOutOfBounds { bit, bits } => {
+                write!(f, "индекс стирания {bit} выходит за границы 0..{bits}")
+            }
+            Self::DuplicateErasureIndex { bit } => {
+                write!(f, "индекс стирания {bit} указан повторно")
+            }
             Self::InvalidEncoderRank { rank, cols } => write!(
                 f,
                 "недопустимый ранг {rank} для систематического кодера с {cols} столбцами"
