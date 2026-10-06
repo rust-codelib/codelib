@@ -1,5 +1,4 @@
-use gf2m::Gf256;
-use gf_linalg::{LinalgError, Matrix};
+use gf_linalg::LinalgError;
 
 #[test]
 fn invalid_dimensions_preserve_rows_and_cols_and_have_a_readable_message() {
@@ -264,41 +263,4 @@ fn polynomial_row_length_mismatch_preserves_row_and_widths() {
 
     fn assert_copy<T: Copy>() {}
     assert_copy::<LinalgError>();
-}
-
-#[test]
-fn matrix_addition_rejects_each_shape_mismatch_with_ordered_dimensions() {
-    for (left_rows, left_cols, right_rows, right_cols) in [
-        (2, 3, 1, 3), // строки отличаются
-        (2, 3, 2, 2), // столбцы отличаются
-        (2, 3, 1, 2), // отличаются обе оси
-        (2, 3, 3, 2), // число элементов одинаковое, форма различается
-    ] {
-        let expected = LinalgError::MatrixShapeMismatch {
-            left_rows,
-            left_cols,
-            right_rows,
-            right_cols,
-        };
-
-        let left = zero_matrix(left_rows, left_cols);
-        let right = zero_matrix(right_rows, right_cols);
-        assert_eq!(left.try_add(&right).unwrap_err(), expected);
-
-        let left = zero_matrix(left_rows, left_cols);
-        let right = zero_matrix(right_rows, right_cols);
-        assert_eq!((&left + &right).unwrap_err(), expected);
-        assert_eq!(left.rows(), left_rows);
-        assert_eq!(left.cols(), left_cols);
-        assert_eq!(right.rows(), right_rows);
-        assert_eq!(right.cols(), right_cols);
-
-        let left = zero_matrix(left_rows, left_cols);
-        let right = zero_matrix(right_rows, right_cols);
-        assert_eq!((left + right).unwrap_err(), expected);
-    }
-}
-
-fn zero_matrix(rows: usize, cols: usize) -> Matrix {
-    Matrix::try_new(rows, cols, vec![Gf256::zero(); rows * cols]).unwrap()
 }
