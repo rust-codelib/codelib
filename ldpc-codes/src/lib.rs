@@ -10,6 +10,6 @@ mod parity_check;
 
 pub use bit::Bit;
 pub use conversion::{bits_to_vector, vector_to_bits, Gf2};
-pub use encoder::SystematicEncoder;
+pub use encoder::{Encoder, SystematicEncoder};
 pub use error::LdpcError;
 pub use parity_check::ParityCheckMatrix;

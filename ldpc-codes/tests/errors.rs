@@ -37,3 +37,27 @@ fn invalid_encoder_rank_has_diagnostic_and_no_wrapped_cause() {
     );
     assert!(error.source().is_none());
 }
+
+#[test]
+fn message_length_mismatch_has_diagnostic_and_no_wrapped_cause() {
+    let error = LdpcError::MessageLengthMismatch {
+        expected: 3,
+        actual: 2,
+    };
+
+    assert_eq!(
+        error.to_string(),
+        "длина сообщения 2 не совпадает с ожидаемой длиной 3"
+    );
+    assert!(error.source().is_none());
+}
+
+#[test]
+fn invalid_codeword_reports_unsatisfied_checks_without_a_wrapped_cause() {
+    let error = LdpcError::InvalidCodeword {
+        unsatisfied_checks: 2,
+    };
+
+    assert_eq!(error.to_string(), "кодовое слово нарушает 2 проверки");
+    assert!(error.source().is_none());
+}

@@ -54,6 +54,18 @@ pub enum LdpcError {
         /// Число столбцов проверочной матрицы.
         cols: usize,
     },
+    /// Длина сообщения не совпадает с числом информационных позиций кодера.
+    MessageLengthMismatch {
+        /// Ожидаемое число информационных битов.
+        expected: usize,
+        /// Фактическое число битов во входном сообщении.
+        actual: usize,
+    },
+    /// Слово правильной длины нарушает проверки исходной матрицы.
+    InvalidCodeword {
+        /// Число нарушенных строк исходной проверочной матрицы.
+        unsatisfied_checks: usize,
+    },
     /// Размер внутреннего хранилища не представим типом `usize`.
     SizeOverflow,
     /// Операция плотной линейной алгебры завершилась ошибкой.
@@ -94,6 +106,13 @@ impl fmt::Display for LdpcError {
                 f,
                 "недопустимый ранг {rank} для систематического кодера с {cols} столбцами"
             ),
+            Self::MessageLengthMismatch { expected, actual } => write!(
+                f,
+                "длина сообщения {actual} не совпадает с ожидаемой длиной {expected}"
+            ),
+            Self::InvalidCodeword { unsatisfied_checks } => {
+                write!(f, "кодовое слово нарушает {unsatisfied_checks} проверки")
+            }
             Self::SizeOverflow => write!(f, "переполнение размера внутреннего хранилища"),
             Self::LinearAlgebra { source } => write!(f, "ошибка линейной алгебры: {source}"),
         }
