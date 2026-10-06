@@ -3,7 +3,9 @@
 #![doc = include_str!("../README.md")]
 
 mod bit;
+mod conversion;
 mod error;
 
 pub use bit::Bit;
+pub use conversion::{bits_to_vector, vector_to_bits, Gf2};
 pub use error::LdpcError;

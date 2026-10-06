@@ -10,6 +10,13 @@ pub enum LdpcError {
         /// Исходное значение, отличное от `0` и `1`.
         value: u8,
     },
+    /// Элемент вектора не равен нулю или единице поля GF(2).
+    InvalidFieldElement {
+        /// Индекс некорректного элемента в векторе, начиная с нуля.
+        index: usize,
+        /// Упакованное представление элемента.
+        value: u64,
+    },
 }
 
 impl fmt::Display for LdpcError {
@@ -17,6 +24,12 @@ impl fmt::Display for LdpcError {
         match self {
             Self::InvalidBit { value } => {
                 write!(f, "недопустимое значение бита: {value}")
+            }
+            Self::InvalidFieldElement { index, value } => {
+                write!(
+                    f,
+                    "элемент вектора с индексом {index} не является битом GF(2): {value}"
+                )
             }
         }
     }
