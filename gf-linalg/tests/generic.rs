@@ -157,6 +157,18 @@ fn arithmetic_only_field_supports_linear_algebra_and_coefficient_conversion() {
     )
     .unwrap();
     assert_eq!(swap.try_determinant(), Ok(-one));
+    let reduced = swap.rref();
+    assert_eq!(reduced.pivot_columns(), &[0, 1]);
+    assert_eq!(
+        reduced.matrix(),
+        &Matrix::try_new(
+            2,
+            2,
+            vec![one, ArithmeticOnly::zero(), ArithmeticOnly::zero(), one]
+        )
+        .unwrap()
+    );
+
     let inverse = swap.try_inverse().unwrap();
     assert_eq!(
         swap.try_mul(&inverse).unwrap().as_slice(),
@@ -170,6 +182,13 @@ fn arithmetic_only_field_supports_linear_algebra_and_coefficient_conversion() {
     let singular = Matrix::<ArithmeticOnly>::try_new(2, 2, vec![one, two, two, one]).unwrap();
     assert_eq!(singular.try_determinant(), Ok(ArithmeticOnly::zero()));
     assert_eq!(singular.try_inverse(), Err(LinalgError::SingularMatrix));
+
+    let zero = Matrix::<ArithmeticOnly>::try_new(2, 2, vec![ArithmeticOnly::zero(); 4]).unwrap();
+    assert_eq!(zero.try_inverse(), Err(LinalgError::SingularMatrix));
+    let zero_result = zero.rref();
+    assert_eq!(zero_result.matrix(), &zero);
+    assert!(zero_result.pivot_columns().is_empty());
+    assert_eq!(zero_result.rank(), 0);
 
     let coefficients = left.try_to_polynomial_coefficients().unwrap();
     assert_eq!(coefficients.as_ref(), left.as_slice());
