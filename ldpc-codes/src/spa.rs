@@ -505,6 +505,10 @@ mod step_tests;
 mod reference_tests;
 
 #[cfg(test)]
+#[path = "spa/decoder_tests.rs"]
+mod decoder_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{Bit, DecodeInput, DecoderConfig, LdpcError, ParityCheckMatrix};

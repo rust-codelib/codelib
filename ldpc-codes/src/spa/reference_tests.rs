@@ -1,5 +1,5 @@
 use super::*;
-use crate::{Bit, DecodeInput, DecoderConfig, LdpcError, ParityCheckMatrix};
+use crate::{Bit, DecodeInput, DecodeStatus, DecoderConfig, LdpcError, ParityCheckMatrix};
 
 /// Медленный тестовый эталон: для каждого сообщения перебирает всех соседей,
 /// кроме получателя, и использует `atanh` вместо промышленного преобразования.
@@ -125,6 +125,70 @@ impl DirectReference {
         self.r = next_r;
         self.q = next_q;
     }
+
+    fn decode_cycle(&mut self, dense_h: &[Vec<bool>], max_iterations: usize) -> ReferenceCycle {
+        let mut syndrome = dense_syndrome(dense_h, &self.word);
+        let mut iterations = 0;
+        while syndrome.contains(&Bit::One) && iterations < max_iterations {
+            self.step();
+            iterations += 1;
+            syndrome = dense_syndrome(dense_h, &self.word);
+        }
+
+        let status = if syndrome.iter().all(|&bit| bit == Bit::Zero) {
+            DecodeStatus::ParitySatisfied
+        } else {
+            DecodeStatus::IterationLimit
+        };
+        ReferenceCycle {
+            word: self.word.clone(),
+            posterior: self.posterior.clone(),
+            syndrome,
+            iterations,
+            status,
+        }
+    }
+}
+
+struct ReferenceCycle {
+    word: Vec<Bit>,
+    posterior: Vec<f64>,
+    syndrome: Vec<Bit>,
+    iterations: usize,
+    status: DecodeStatus,
+}
+
+fn dense_syndrome(matrix: &[Vec<bool>], word: &[Bit]) -> Vec<Bit> {
+    matrix
+        .iter()
+        .map(|row| {
+            let parity = row.iter().zip(word).fold(false, |parity, (&one, bit)| {
+                parity ^ (one && *bit == Bit::One)
+            });
+            if parity {
+                Bit::One
+            } else {
+                Bit::Zero
+            }
+        })
+        .collect()
+}
+
+fn sparse_checks_from_dense(matrix: &[Vec<bool>]) -> ParityCheckMatrix {
+    let bits = matrix.first().expect("matrix has at least one row").len();
+    ParityCheckMatrix::try_from_rows(
+        bits,
+        matrix
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .enumerate()
+                    .filter_map(|(bit, &present)| present.then_some(bit))
+                    .collect()
+            })
+            .collect(),
+    )
+    .expect("dense fixture is a valid parity-check matrix")
 }
 
 #[test]
@@ -208,6 +272,72 @@ fn direct_reference_matches_q_r_and_posterior_for_two_llr2_steps() {
         state.step(config);
         reference.step();
         assert_state_matches_reference(&state, &reference, &format!("LLR_2 after step {step}"));
+    }
+}
+
+#[test]
+fn independent_dense_syndrome_cycle_runs_both_general_plan_examples() {
+    let dense_h = vec![
+        vec![true, true, false, true, false, false],
+        vec![false, true, true, false, true, false],
+        vec![true, false, false, false, true, true],
+        vec![false, false, true, true, false, true],
+    ];
+    let checks = sparse_checks_from_dense(&dense_h);
+    let expected_word = [
+        Bit::Zero,
+        Bit::Zero,
+        Bit::One,
+        Bit::Zero,
+        Bit::One,
+        Bit::One,
+    ];
+    // Получены из DirectReference до сравнения с SpaDecoder.
+    let expected_reference_iterations = [1, 3];
+    let examples = [
+        [-1.3863, 1.3863, -1.3863, 1.3863, -1.3863, -1.3863],
+        [-0.5, 2.5, -4.0, 5.0, -3.5, 2.5],
+    ];
+    let config = DecoderConfig::default();
+
+    for (index, llrs) in examples.into_iter().enumerate() {
+        let input = DecodeInput {
+            llrs: &llrs,
+            erasures: &[],
+        };
+        let mut reference = DirectReference::new(&checks, input, config);
+        let reference_result = reference.decode_cycle(&dense_h, config.max_iterations());
+
+        assert_eq!(
+            reference_result.word, expected_word,
+            "reference example {index}"
+        );
+        assert_eq!(
+            reference_result.syndrome,
+            [Bit::Zero; 4],
+            "dense XOR syndrome for reference example {index}"
+        );
+        assert_eq!(reference_result.status, DecodeStatus::ParitySatisfied);
+        assert_eq!(
+            reference_result.iterations, expected_reference_iterations[index],
+            "pinned independent reference count for example {index}"
+        );
+
+        let mut decoder = SpaDecoder::try_new(sparse_checks_from_dense(&dense_h), config)
+            .expect("the general-plan matrix is valid for SPA");
+        let result = decoder
+            .decode(input, None)
+            .expect("the general-plan LLR block is valid");
+        assert_eq!(result.word(), reference_result.word);
+        assert_float_slices_close(
+            &reference_result.posterior,
+            result.posterior_llrs(),
+            &format!("SPA posterior for reference example {index}"),
+        );
+        assert_eq!(result.syndrome(), reference_result.syndrome);
+        assert_eq!(result.syndrome(), dense_syndrome(&dense_h, result.word()));
+        assert_eq!(result.status(), reference_result.status);
+        assert_eq!(result.iterations(), reference_result.iterations);
     }
 }
 
