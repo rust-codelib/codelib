@@ -1,5 +1,6 @@
 //! Проверочная матрица двоичного LDPC-кода в разреженном виде.
 
+use core::mem::size_of;
 use gf_linalg::MAX_MATRIX_DIM;
 
 use crate::LdpcError;
@@ -8,8 +9,9 @@ use crate::LdpcError;
 ///
 /// Каждая строка содержит отсортированные индексы битов. Пустые и одинаковые
 /// строки допустимы; столбцы без единиц также сохраняются в размере матрицы.
-/// Внутреннее хранилище занимает место пропорционально числу строк и единиц,
-/// без выделения плотной матрицы `rows × cols`.
+/// Хранилище обеих смежностей занимает `O(m + n + E)`, без выделения плотной
+/// матрицы `rows × cols`, где `m` — число проверок, `n` — число битов, а `E` —
+/// число единиц.
 ///
 /// ```
 /// use ldpc_codes::ParityCheckMatrix;
@@ -23,7 +25,9 @@ use crate::LdpcError;
 #[derive(Debug)]
 pub struct ParityCheckMatrix {
     check_bits: Vec<Vec<usize>>,
+    bit_checks: Vec<Vec<usize>>,
     bits: usize,
+    edge_count: usize,
 }
 
 impl ParityCheckMatrix {
@@ -67,9 +71,25 @@ impl ParityCheckMatrix {
                 .ok_or(LdpcError::SizeOverflow)?;
         }
 
+        // Проверяем размеры выделяемых буферов до построения обратных списков.
+        bits.checked_mul(size_of::<Vec<usize>>())
+            .ok_or(LdpcError::SizeOverflow)?;
+        edge_count
+            .checked_mul(size_of::<usize>())
+            .ok_or(LdpcError::SizeOverflow)?;
+        let mut bit_checks = Vec::with_capacity(bits);
+        bit_checks.resize_with(bits, Vec::new);
+        for (check, row) in rows.iter().enumerate() {
+            for &bit in row {
+                bit_checks[bit].push(check);
+            }
+        }
+
         Ok(Self {
             check_bits: rows,
+            bit_checks,
             bits,
+            edge_count,
         })
     }
 
@@ -85,6 +105,12 @@ impl ParityCheckMatrix {
         self.bits
     }
 
+    /// Возвращает общее число единиц матрицы.
+    #[must_use]
+    pub fn edge_count(&self) -> usize {
+        self.edge_count
+    }
+
     /// Возвращает отсортированные индексы битов заданной проверки.
     ///
     /// Для существующей проверки без единиц возвращается `Some(&[])`, а для
@@ -92,5 +118,14 @@ impl ParityCheckMatrix {
     #[must_use]
     pub fn check_bits(&self, check: usize) -> Option<&[usize]> {
         self.check_bits.get(check).map(Vec::as_slice)
+    }
+
+    /// Возвращает отсортированные индексы проверок, содержащих заданный бит.
+    ///
+    /// Для существующего бита без единиц возвращается `Some(&[])`, а для
+    /// индекса за границей — `None`.
+    #[must_use]
+    pub fn bit_checks(&self, bit: usize) -> Option<&[usize]> {
+        self.bit_checks.get(bit).map(Vec::as_slice)
     }
 }

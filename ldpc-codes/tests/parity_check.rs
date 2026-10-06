@@ -76,6 +76,92 @@ fn sorts_each_row_and_keeps_empty_and_repeated_rows() {
 }
 
 #[test]
+fn builds_sorted_reverse_adjacency_for_unsorted_repeated_checks() {
+    let matrix =
+        ParityCheckMatrix::try_from_rows(4, vec![vec![3, 0], vec![2, 0], vec![3, 0], vec![]])
+            .unwrap();
+
+    assert_eq!(matrix.bit_checks(0), Some(&[0, 1, 2][..]));
+    assert_eq!(matrix.bit_checks(1), Some(&[][..]));
+    assert_eq!(matrix.bit_checks(2), Some(&[1][..]));
+    assert_eq!(matrix.bit_checks(3), Some(&[0, 2][..]));
+}
+
+#[test]
+fn both_adjacencies_describe_each_edge_once_and_report_the_same_count() {
+    let matrix =
+        ParityCheckMatrix::try_from_rows(5, vec![vec![4, 1, 0], vec![2, 1], vec![4, 0], vec![]])
+            .unwrap();
+
+    let check_edge_count: usize = (0..matrix.rows())
+        .map(|check| matrix.check_bits(check).unwrap().len())
+        .sum();
+    let bit_edge_count: usize = (0..matrix.cols())
+        .map(|bit| matrix.bit_checks(bit).unwrap().len())
+        .sum();
+
+    assert_eq!(matrix.edge_count(), 7);
+    assert_eq!(check_edge_count, matrix.edge_count());
+    assert_eq!(bit_edge_count, matrix.edge_count());
+
+    for check in 0..matrix.rows() {
+        for &bit in matrix.check_bits(check).unwrap() {
+            assert_eq!(
+                matrix
+                    .bit_checks(bit)
+                    .unwrap()
+                    .iter()
+                    .filter(|&&c| c == check)
+                    .count(),
+                1
+            );
+        }
+    }
+    for bit in 0..matrix.cols() {
+        for &check in matrix.bit_checks(bit).unwrap() {
+            assert!(matrix.check_bits(check).unwrap().contains(&bit));
+        }
+    }
+}
+
+#[test]
+fn zero_matrix_has_empty_adjacencies_and_no_edges() {
+    let matrix = ParityCheckMatrix::try_from_rows(3, vec![vec![], vec![]]).unwrap();
+
+    assert_eq!(matrix.edge_count(), 0);
+    assert_eq!(matrix.bit_checks(0), Some(&[][..]));
+    assert_eq!(matrix.bit_checks(1), Some(&[][..]));
+    assert_eq!(matrix.bit_checks(2), Some(&[][..]));
+}
+
+#[test]
+fn reverse_adjacency_supports_last_allowed_check_and_bit() {
+    let mut rows = vec![Vec::new(); MAX_MATRIX_DIM];
+    rows[MAX_MATRIX_DIM - 1].push(MAX_MATRIX_DIM - 1);
+    let matrix = ParityCheckMatrix::try_from_rows(MAX_MATRIX_DIM, rows).unwrap();
+
+    assert_eq!(
+        matrix.check_bits(MAX_MATRIX_DIM - 1),
+        Some(&[MAX_MATRIX_DIM - 1][..])
+    );
+    assert_eq!(
+        matrix.bit_checks(MAX_MATRIX_DIM - 1),
+        Some(&[MAX_MATRIX_DIM - 1][..])
+    );
+    assert_eq!(matrix.edge_count(), 1);
+}
+
+#[test]
+fn reverse_adjacency_distinguishes_isolated_and_out_of_bounds_bits() {
+    let matrix = ParityCheckMatrix::try_from_rows(3, vec![vec![0]]).unwrap();
+
+    assert_eq!(matrix.bit_checks(1), Some(&[][..]));
+    assert_eq!(matrix.bit_checks(2), Some(&[][..]));
+    assert_eq!(matrix.bit_checks(3), None);
+    assert_eq!(matrix.bit_checks(usize::MAX), None);
+}
+
+#[test]
 fn distinguishes_a_missing_check_from_an_existing_empty_check() {
     let matrix = ParityCheckMatrix::try_from_rows(2, vec![vec![]]).unwrap();
 
