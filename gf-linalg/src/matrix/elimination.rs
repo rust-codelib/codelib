@@ -14,6 +14,45 @@ pub struct RrefResult<F: FieldElement = Gf256> {
     pivot_columns: Vec<usize>,
 }
 
+fn find_pivot_row<F: FieldElement>(
+    data: &[F],
+    cols: usize,
+    start_row: usize,
+    row_count: usize,
+    pivot_col: usize,
+) -> Option<usize> {
+    (start_row..row_count).find(|&row| !data[row * cols + pivot_col].is_zero())
+}
+
+fn swap_rows<F>(data: &mut [F], cols: usize, first_row: usize, second_row: usize) {
+    for col in 0..cols {
+        data.swap(first_row * cols + col, second_row * cols + col);
+    }
+}
+
+fn scale_row<F: FieldElement>(data: &mut [F], cols: usize, row: usize, factor: F) {
+    let row_offset = row * cols;
+    for col in 0..cols {
+        data[row_offset + col] = data[row_offset + col] * factor;
+    }
+}
+
+fn subtract_row_multiple<F: FieldElement>(
+    data: &mut [F],
+    cols: usize,
+    target_row: usize,
+    pivot_row: usize,
+    start_col: usize,
+    factor: F,
+) {
+    let target_offset = target_row * cols;
+    let pivot_offset = pivot_row * cols;
+    for col in start_col..cols {
+        let pivot_value = data[pivot_offset + col];
+        data[target_offset + col] = data[target_offset + col] - factor * pivot_value;
+    }
+}
+
 impl<F: FieldElement> RrefResult<F> {
     /// Возвращает приведённую матрицу без передачи владения.
     pub fn matrix(&self) -> &Matrix<F> {
@@ -91,24 +130,19 @@ impl<F: FieldElement> Matrix<F> {
                 break;
             }
 
-            let Some(found_row) =
-                (pivot_row..self.rows).find(|&row| !data[row * self.cols + pivot_col].is_zero())
+            let Some(found_row) = find_pivot_row(&data, self.cols, pivot_row, self.rows, pivot_col)
             else {
                 continue;
             };
 
             if found_row != pivot_row {
-                for col in 0..self.cols {
-                    data.swap(found_row * self.cols + col, pivot_row * self.cols + col);
-                }
+                swap_rows(&mut data, self.cols, found_row, pivot_row);
             }
 
             let pivot_offset = pivot_row * self.cols;
             let pivot_index = pivot_offset + pivot_col;
             let pivot_inverse = data[pivot_index].inv();
-            for col in 0..self.cols {
-                data[pivot_offset + col] = data[pivot_offset + col] * pivot_inverse;
-            }
+            scale_row(&mut data, self.cols, pivot_row, pivot_inverse);
 
             for row in 0..self.rows {
                 if row == pivot_row {
@@ -121,10 +155,7 @@ impl<F: FieldElement> Matrix<F> {
                     continue;
                 }
 
-                for col in 0..self.cols {
-                    let pivot_value = data[pivot_offset + col];
-                    data[row_offset + col] = data[row_offset + col] - factor * pivot_value;
-                }
+                subtract_row_multiple(&mut data, self.cols, row, pivot_row, 0, factor);
             }
 
             pivot_columns.push(pivot_col);
@@ -176,16 +207,13 @@ impl<F: FieldElement> Matrix<F> {
         let mut determinant = F::one();
 
         for pivot_col in 0..n {
-            let Some(pivot_row) = (pivot_col..n).find(|&row| !work[row * n + pivot_col].is_zero())
-            else {
+            let Some(pivot_row) = find_pivot_row(&work, n, pivot_col, n, pivot_col) else {
                 return Ok(F::zero());
             };
 
             if pivot_row != pivot_col {
                 determinant = -determinant;
-                for col in 0..n {
-                    work.swap(pivot_row * n + col, pivot_col * n + col);
-                }
+                swap_rows(&mut work, n, pivot_row, pivot_col);
             }
 
             let pivot = work[pivot_col * n + pivot_col];
@@ -200,11 +228,7 @@ impl<F: FieldElement> Matrix<F> {
                     continue;
                 }
 
-                let pivot_offset = pivot_col * n;
-                for col in pivot_col + 1..n {
-                    let pivot_value = work[pivot_offset + col];
-                    work[row_offset + col] = work[row_offset + col] - factor * pivot_value;
-                }
+                subtract_row_multiple(&mut work, n, row, pivot_col, pivot_col + 1, factor);
                 work[row_offset + pivot_col] = F::zero();
             }
         }
@@ -278,42 +302,31 @@ impl<F: FieldElement> Matrix<F> {
         }
 
         for pivot_col in 0..n {
-            let Some(pivot_row) = (pivot_col..n).find(|&row| !left[row * n + pivot_col].is_zero())
-            else {
+            let Some(pivot_row) = find_pivot_row(&left, n, pivot_col, n, pivot_col) else {
                 return Err(LinalgError::SingularMatrix);
             };
 
             if pivot_row != pivot_col {
-                for col in 0..n {
-                    left.swap(pivot_row * n + col, pivot_col * n + col);
-                    right.swap(pivot_row * n + col, pivot_col * n + col);
-                }
+                swap_rows(&mut left, n, pivot_row, pivot_col);
+                swap_rows(&mut right, n, pivot_row, pivot_col);
             }
 
             let pivot_inverse = left[pivot_col * n + pivot_col].inv();
-            for col in 0..n {
-                left[pivot_col * n + col] = left[pivot_col * n + col] * pivot_inverse;
-                right[pivot_col * n + col] = right[pivot_col * n + col] * pivot_inverse;
-            }
+            scale_row(&mut left, n, pivot_col, pivot_inverse);
+            scale_row(&mut right, n, pivot_col, pivot_inverse);
 
-            let pivot_offset = pivot_col * n;
             for row in 0..n {
                 if row == pivot_col {
                     continue;
                 }
 
-                let row_offset = row * n;
-                let factor = left[row_offset + pivot_col];
+                let factor = left[row * n + pivot_col];
                 if factor.is_zero() {
                     continue;
                 }
 
-                for col in 0..n {
-                    let left_pivot_value = left[pivot_offset + col];
-                    let right_pivot_value = right[pivot_offset + col];
-                    left[row_offset + col] = left[row_offset + col] - factor * left_pivot_value;
-                    right[row_offset + col] = right[row_offset + col] - factor * right_pivot_value;
-                }
+                subtract_row_multiple(&mut left, n, row, pivot_col, 0, factor);
+                subtract_row_multiple(&mut right, n, row, pivot_col, 0, factor);
             }
         }
 
