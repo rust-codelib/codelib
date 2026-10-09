@@ -267,6 +267,7 @@ name = "gf-linalg"
 version = "0.1.0"
 dependencies = [
  "gf2m",
+ "gfpm",
 ]
 
 [[package]]

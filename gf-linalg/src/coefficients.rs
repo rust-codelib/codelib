@@ -68,6 +68,7 @@
 //! }
 //! ```
 
+use crate::matrix::checked_element_count;
 use crate::{FieldElement, LinalgError, Matrix, Vector, MAX_MATRIX_DIM};
 use std::mem::size_of;
 
@@ -151,9 +152,7 @@ impl<F: FieldElement> Matrix<F> {
     /// индексом строки, если её массив коэффициентов превышает предел.
     /// Ограничение оси матрицы не отменяет проверку размера строки для `F`.
     pub fn try_to_polynomial_rows(&self) -> Result<Vec<Box<[F]>>, LinalgError> {
-        for row in 0..self.rows() {
-            check_coefficient_limit::<F>(Some(row), self.cols())?;
-        }
+        check_coefficient_limit::<F>(Some(0), self.cols())?;
 
         Ok(self
             .as_slice()
@@ -215,34 +214,29 @@ impl<F: FieldElement> Matrix<F> {
         }
 
         for (row_index, row) in rows.iter().enumerate().skip(1) {
-            let actual = row.len();
-            if !(1..=MAX_MATRIX_DIM).contains(&actual) {
+            let actual_cols = row.len();
+            if !(1..=MAX_MATRIX_DIM).contains(&actual_cols) {
                 return Err(LinalgError::InvalidDimensions {
                     rows: row_count,
-                    cols: actual,
+                    cols: actual_cols,
                 });
             }
-            if actual != cols {
+            if actual_cols != cols {
                 return Err(LinalgError::PolynomialRowLengthMismatch {
                     row: row_index,
                     expected: cols,
-                    actual,
+                    actual: actual_cols,
                 });
             }
         }
 
-        let element_count = row_count
-            .checked_mul(cols)
-            .ok_or(LinalgError::InvalidDimensions {
-                rows: row_count,
-                cols,
-            })?;
+        let element_count = checked_element_count(row_count, cols)?;
         let mut data = Vec::with_capacity(element_count);
         for row in rows {
             data.extend_from_slice(&row);
         }
 
-        Matrix::<F>::try_new(row_count, cols, data)
+        Self::try_new(row_count, cols, data)
     }
 }
 
