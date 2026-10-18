@@ -9,6 +9,8 @@ mod decode;
 mod error;
 mod field;
 mod observer;
+#[cfg(test)]
+mod paper_tests;
 mod params;
 mod repair;
 mod structure;
