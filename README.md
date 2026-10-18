@@ -18,6 +18,18 @@ cargo run -p ldpc-codes --example decode_with_log
 cargo run -p ldpc-codes --example decode_round_trip
 ```
 
+## Каскадные регенерирующие коды
+
+Крейт [`cascade-codes`](cascade-codes/README.md) реализует каскадные коды Elyasi–Mohajer ([arXiv:1901.00911](https://arxiv.org/abs/1901.00911)) для распределённого хранения: файл распределяется по `n` узлам, любые `k` узлов восстанавливают его, а отказавший узел точно восстанавливается по `d` помощникам, каждый из которых передаёт `beta` символов. Режим `mu ∈ 1..=k` выбирает точку компромисса от MBR (`mu = 1`) до MSR (`mu = k`). Поддерживаются поля `gf2m` и `gfpm`, байтовые сообщения до 4096 байт, поиск испорченных узлов и журнал событий. [Руководство крейта](cascade-codes/README.md) описывает API, реализацию и ограничения.
+
+```sh
+cargo run -p cascade-codes --example round_trip
+cargo run -p cascade-codes --example node_repair
+cargo run -p cascade-codes --example tradeoff -- 8 4 6
+cargo run -p cascade-codes --example locate_corruption
+cargo run --release -p cascade-codes --example metrics
+```
+
 ## Согласованные ограничения размеров
 
 | Объект | Ограничение |
