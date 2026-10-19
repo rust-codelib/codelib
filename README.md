@@ -18,6 +18,19 @@ cargo run -p ldpc-codes --example decode_with_log
 cargo run -p ldpc-codes --example decode_round_trip
 ```
 
+## Двоичные коды Рида–Маллера
+
+Крейт [`rm-codes`](rm-codes/README.md) реализует кодер и мажоритарный декодер Рида для `RM(r, m)`, конфигуратор, наблюдатель и подсчёт битовых ошибок. Поддерживаются `1 <= m <= 12` и `0 <= r <= m`; кодирование несистематическое, декодер работает с жёсткими решениями.
+
+Четыре примера можно запустить из корня workspace:
+
+```sh
+cargo run -p rm-codes --example encode
+cargo run -p rm-codes --example decode_reed
+cargo run -p rm-codes --example decode_with_log
+cargo run -p rm-codes --example round_trip
+```
+
 ## Согласованные ограничения размеров
 
 | Объект | Ограничение |

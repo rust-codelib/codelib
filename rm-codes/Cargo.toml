@@ -1,0 +1,17 @@
+[package]
+name = "rm-codes"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Двоичные коды Рида–Маллера: кодер, мажоритарный декодер Рида и конфигуратор"
+keywords = ["reed-muller", "error-correction", "fec", "binary", "codes"]
+categories = ["encoding", "algorithms", "mathematics"]
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lib]
+name = "rm_codes"
+path = "src/lib.rs"
