@@ -15,6 +15,8 @@
 
 LDPC и RS используют собственные API и пока не подключены к `coding-core`.
 
+[`kerdock-codes`](kerdock-codes/README.md#shared-coding-core-block-interfaces) implements the shared `coding-core` block encoder/decoder interfaces; run `cargo run -p kerdock-codes --example shared_codec`.
+
 ## Двоичные LDPC-коды
 
 Крейт [`ldpc-codes`](ldpc-codes/README.md) предоставляет разреженную проверочную матрицу, систематический кодер, полный SPA-декодер и конфигуратор согласованной пары. [Руководство крейта](ldpc-codes/README.md) содержит быстрый старт и примеры API.

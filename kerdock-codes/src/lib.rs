@@ -48,6 +48,52 @@
 //! use `KerdockSize::try_from(bit_length)?` before calling [`Kerdock::new`];
 //! the conversion takes neither an exponent nor a byte count.
 //!
+//! # Shared block interfaces
+//!
+//! [`coding_core::Encoder`] and [`coding_core::Decoder`] accept `&[bool]` and
+//! `&mut self`, but retain no per-call state and emit no events (`Event = ()`).
+//! Inputs and previous owned results remain unchanged on success, stop, or error.
+//! Each input must be a complete block: short input is an error, never `NeedMore`.
+//! Valid messages carry 8/12/16/20 bits (1/2/2/3 transmitted bytes), always below
+//! [`coding_core::MAX_MESSAGE_BYTES`], regardless of Rust object storage.
+//!
+//! The inherent `encode`/`decode` methods keep their convenient one-argument API.
+//! Importing a trait does not disambiguate these colliding method names: use a
+//! generic trait bound or fully-qualified calls as below.
+//!
+//! ```
+//! use coding_core::{Codeword, DecodeOutcome, Decoder, Encoder, NoopObserver};
+//! use core::convert::Infallible;
+//! use kerdock_codes::{
+//!     DecodeResult, Kerdock, KerdockChecks, KerdockError, KerdockSize, KerdockStopReason,
+//! };
+//!
+//! # fn main() -> Result<(), KerdockError> {
+//! let mut codec = Kerdock::new(KerdockSize::Bits16);
+//! let message = [true, false, false, false, false, false, false, false];
+//! let word: Codeword<Vec<bool>> =
+//!     <Kerdock as Encoder<&[bool]>>::encode(&mut codec, &message, &mut NoopObserver)?;
+//! let outcome: DecodeOutcome<DecodeResult, KerdockChecks, Infallible, KerdockStopReason> =
+//!     <Kerdock as Decoder<&[bool]>>::decode(&mut codec, &word.0, &mut NoopObserver)?;
+//! match outcome {
+//!     DecodeOutcome::Candidate(candidate) => {
+//!         assert_eq!(candidate.value.message(), message);
+//!         assert_eq!(candidate.checks.distance, 0);
+//!         assert_eq!(candidate.checks.radius, 2);
+//!     }
+//!     DecodeOutcome::Stopped(reason) => panic!("no candidate: {reason:?}"),
+//!     DecodeOutcome::NeedMore(never) => match never {},
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! Shared decoding maps only [`KerdockError::NoCodewordWithinRadius`] to
+//! [`coding_core::DecodeOutcome::Stopped`] with [`KerdockStopReason`]; malformed
+//! input stays `Err`. The inherent decoder still returns its original error.
+//! [`KerdockChecks`] describes distance to the returned word and the configured
+//! radius, not proof of identity with the transmitted original.
+//!
 //! # Resources
 //!
 //! Requires `std` and Rust 1.81+. Quadratic rows are packed into `u64` words:
@@ -85,6 +131,7 @@
 
 #![forbid(unsafe_code)]
 
+mod contracts;
 mod decode;
 mod encode;
 mod error;
@@ -92,6 +139,7 @@ mod quadratic;
 mod size;
 mod walsh;
 
+pub use contracts::{KerdockChecks, KerdockStopReason};
 pub use decode::DecodeResult;
 pub use error::KerdockError;
 use quadratic::QuadraticTable;

@@ -2,7 +2,7 @@
 
 `kerdock-codes` — параметризованный нелинейный блоковый код с жёстким
 декодированием по расстоянию Хэмминга. Требуются Rust 1.81+ и `std`;
-единственная зависимость времени выполнения — локальный `gf2m`.
+зависимости времени выполнения — локальные `gf2m` и `coding-core`.
 
 ## Быстрый старт
 
@@ -87,6 +87,78 @@ fn main() -> Result<(), KerdockError> {
 
 Результат декодирования владеет сообщением и словом; последующие вызовы кодека
 его не меняют. Методы работают через `&self` и используют локальные буферы.
+
+## Shared coding-core block interfaces
+
+`Kerdock` also implements `coding_core::Encoder<&[bool]>` and
+`coding_core::Decoder<&[bool]>`, preserving the inherent methods above.
+Trait and inherent method names collide: importing the traits alone is not
+enough to select them. Use a generic trait bound or fully-qualified calls:
+
+```rust
+use coding_core::{Decoder, Encoder, NoopObserver};
+use kerdock_codes::{Kerdock, KerdockError, KerdockSize};
+
+fn main() -> Result<(), KerdockError> {
+    let mut codec = Kerdock::new(KerdockSize::Bits16);
+    let message = [true, false, false, false, false, false, false, false];
+    let word = <Kerdock as Encoder<&[bool]>>::encode(
+        &mut codec, &message, &mut NoopObserver,
+    )?;
+    let outcome = <Kerdock as Decoder<&[bool]>>::decode(
+        &mut codec, &word.0, &mut NoopObserver,
+    )?;
+    println!("{outcome:?}");
+    Ok(())
+}
+```
+
+| Shared associated type | Value |
+| --- | --- |
+| Encoder `Output` | `coding_core::Codeword<Vec<bool>>` |
+| Decoder `Value` | `DecodeResult` (owns message and recovered word) |
+| Decoder `Checks` | `KerdockChecks { distance: usize, radius: usize }` |
+| Decoder `NeedMore` | `core::convert::Infallible` |
+| Decoder `StopReason` | `KerdockStopReason` |
+| Both `Error` | `KerdockError` |
+| Both `Event` | `()` (no events emitted) |
+
+The shared decoder returns
+`Result<DecodeOutcome<DecodeResult, KerdockChecks, Infallible, KerdockStopReason>, KerdockError>`:
+
+- `Candidate` contains the inherent result and the actual executed distance-bound
+  check: `checks.distance == value.distance()` and `checks.radius` is the code's
+  correction radius. Passing the check does not prove identity with the
+  transmitted original or measure the unknown channel error count.
+- `Stopped(OutsideCorrectionRadius { nearest_distance, radius })` means no word
+  lies within the radius. The nearest distance is exact; outside-radius ties
+  also stop. In contrast, direct `codec.decode(&input)` still returns
+  `Err(KerdockError::NoCodewordWithinRadius { .. })` for the same block.
+- Malformed input remains `Err` with the original length error fields; no
+  partial candidate is returned. All errors other than radius rejection are
+  preserved. `NeedMore` cannot be constructed: this is complete-block decoding,
+  not streaming or accumulation.
+
+Shared methods take `&mut self` only to satisfy the traits. Each call is
+independent, retaining no per-call state. No observer events are emitted on
+success, stop, or error; choosing an observer cannot change the result. Inputs
+and previous owned outputs remain unchanged on all paths. Allocation and `std`
+requirements are unchanged; using a `no_std` interface does not make this codec
+`no_std`.
+
+The fixed message capacities 8/12/16/20 bits occupy 1/2/2/3 **transmitted bytes**
+(rounding the last byte up), not the Rust storage size of `bool` elements.
+Every valid configuration therefore satisfies `coding_core::MAX_MESSAGE_BYTES`
+(4096) for both original and recovered messages. Any other encoder length,
+including more than 32768 bits, is rejected as `MessageLengthMismatch` before
+output allocation; no extra packing or arbitrary message-length mode is added.
+
+Run [`examples/shared_codec.rs`](examples/shared_codec.rs) for candidate, known
+midpoint stop (`0x02c0`, distance 3, radius 2), and malformed-input error handling:
+
+```sh
+cargo run -p kerdock-codes --example shared_codec
+```
 
 ## Порядок битов и координат
 
