@@ -1,0 +1,305 @@
+{
+  "measured_utc": "2026-10-18T22:44:01.910087+00:00",
+  "note": "Selected recorded results from 2026-10-19 after the sample-count fix; not a new run or article-scale reliability estimate.",
+  "parameters": {
+    "paper": false,
+    "instances": 2,
+    "trials": 3,
+    "seed": 42,
+    "epsilon": "0.1",
+    "loss": "0.4",
+    "repair_loss": "0.1",
+    "max_observations": 100,
+    "max_work": 1000000000,
+    "time_budget_seconds": 60,
+    "toolchain": "stable"
+  },
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "source_sha256": {
+    "Cargo.lock": "48c43b16d42bd5c076b0a14bf23d1af3a2011139b7d8cc9ea252b172cf98467a",
+    "Cargo.toml": "ae71a454215b80bf6d61183c517d770d2a0690227e7544f0a48c159509d812d2",
+    "coding-core/examples/buffers.rs": "ef1e7c155cb423388182623f0877a6274f3d2c92a46ac6bc81d87e8fef3c6d1b",
+    "coding-core/src/lib.rs": "96ac1326276403296786f03552ec34e65ec481849b59aa34b5711d6454b53d38",
+    "coding-core/src/observation.rs": "cfb6748916b1a2de676f4dfd7eff85f0390934952b5005dbf2c105e5840d7a3c",
+    "coding-core/src/outcome.rs": "6beaeb769481b4a1ebec05862f72e2ab22d4102223f63153d3bd40f43596dc40",
+    "coding-core/src/repair.rs": "d57dc27278653a5287b402bf97e27169266fe29b01aed543a918be1be42b3c50",
+    "coding-core/src/roles.rs": "4b77178de062744dbc14d1491352ef8624f53ed77eb6ebc73da4e7e6e1422a29",
+    "coding-core/src/size.rs": "236ce100f2f9b7e2b93e800165aeb45ccac9ae7149f5a9fa4a3db16573b0ef5b",
+    "coding-core/tests/buffers.rs": "7d7f327a7d25a83fe85ab4c7c1948a7103429e28e60380db7d64a0aa2a47c5d3",
+    "coding-core/tests/contracts.rs": "e7d97331294b1150d947b1f379c32a0f28c522fe4e0bcf09593fed0911b4f65e",
+    "coding-core/tests/support/block.rs": "1843dde66edaa2af191eebcddfac2942f981806481aff6bf170d09c2bb7bba73",
+    "coding-core/tests/support/buffers.rs": "94e5a0c387dcaba8e1b73c1becb328318b29e3e356721052593af4631da2c276",
+    "coding-core/tests/support/repair.rs": "e6f4a0938c2fd65251965295cd1bf3dec8109f021a0743131e67730cbf5fb7e5",
+    "coding-core/tests/support/stream.rs": "d0a9ff9532f4931edad941134a8aaf274608ef93d66afadd2dfeaffe30d6e3d7",
+    "docs/fixtures/fountain-v1.json": "b90d30a9d06bd46f7a8fe68b891163b55ec2c041b176711e99f30a5de8447cc9",
+    "fountain-codes/Cargo.toml": "cbf42529a2ad9cb8509d9c694d8047e0ed72f72d05862d9829a01765bcba08f9",
+    "fountain-codes/examples/decode_with_log.rs": "bfd130801b88c79f1ec802ccc2ab10a085035c33b9e6a0218cabeb67e801122e",
+    "fountain-codes/examples/decode_with_losses.rs": "91a8b738f8d30467a2006d536453f41cf1e5d0b0db43509c8fc9f7fcb2de03bd",
+    "fountain-codes/examples/experiment.rs": "32b942b90e9cbb7b129f6649286fa70a930e350a9ce6c7b0fe0f1dff2c38f192",
+    "fountain-codes/examples/repair_alternative_group.rs": "2216b084126ff329d1d5b130815f7981003d185234fb17e61689f5f89b820699",
+    "fountain-codes/examples/repair_one_symbol.rs": "69a2d2533a3bb6d9bffd44ff7ba79e80c9da1ecf716c91590421f4b1662a7bd6",
+    "fountain-codes/examples/support/mod.rs": "55baef6cd865c38b6d70cba0bb90bd8f262953fbdd8c0f3e5577c2b71b42bd05",
+    "fountain-codes/examples/support/sample_size.rs": "aeca47f03271c1686b45ce35889ee957de936e8b961fabe0f90cae8041c3af3a",
+    "fountain-codes/examples/systematic_symbols.rs": "501072f7f84ffd01fb63a4801933ac8ae7c49de48daa931a545638475dc05c4d",
+    "fountain-codes/src/arithmetic.rs": "2be5919769362403e1ea49cddda3a522b8138ac909b54c00ef688c2a23c53651",
+    "fountain-codes/src/coefficients.rs": "6281cf815ea51936f9029200d30b32e95f70da5240e0217694aa1b989f2f0588",
+    "fountain-codes/src/decoder.rs": "ad488689bee670afa22b226759c16af2fac3f46af80b5d43ff4b7746717bca18",
+    "fountain-codes/src/encoder.rs": "853bf54566b15fe072b12c16ab22e414e4e080c97fa8e0dadca933fe7d35485b",
+    "fountain-codes/src/error.rs": "cc5ac01c64d7fc83f215acdf606100854252a8e363483dedec6e0b40a42a6a33",
+    "fountain-codes/src/generator.rs": "534313f48c628d2b9e2556476b6770ad0bb046cc82f53d8ac781dd450e5ec001",
+    "fountain-codes/src/lib.rs": "a953a1bfac9b3b8525839f45130702a6ac4157f08d30b53abc6180b535ddac78",
+    "fountain-codes/src/repair.rs": "45b92913d799efad22efa928f6b64e6026b181da95dbadc347d173bf7f3ffadc",
+    "fountain-codes/src/resources.rs": "95b4dfada55ec6ce297915320f6301a8315895a9da8c638c747e597e07cbc9ce",
+    "fountain-codes/src/types.rs": "bb2ffeaeecc637984d1f212009eb79e3365be2af6d8088af9a73f1e4fd60de7c",
+    "fountain-codes/src/wire.rs": "cc87d581b7f909fb2ae7cfa7902da6f0885963857dd1f47a1459fb4e2e852087",
+    "fountain-codes/tests/contracts.rs": "697a66dcfe9b04a8796ecbed3378c0a95af6ac404c52e1d7d0a197ed6a4a981b",
+    "fountain-codes/tests/decoding.rs": "ccee3a6279dadf840ec4b128071fa30c1fb124583f97fb26a5ec65763167bfbd",
+    "fountain-codes/tests/experiment_parameters.rs": "c3fdf2717747cfe2f47718a93282628c3a0ff383f42ae81be9c01b4df195e505",
+    "fountain-codes/tests/properties.rs": "4784af7c7625840d97bfcb3bb8df72627a180803356762bc4b08f005562c5929",
+    "fountain-codes/tests/repair.rs": "9c36cb928e5d3368efd795ceb37acf35ef6133793ae3c9488e05779b6a4081e5",
+    "fountain-codes/tests/vectors.rs": "28bc77893802e80822cb8ffb9bba4abe10ba1aff7e8eae6fe76fe9672376cf63",
+    "fountain-codes/tests/wire.rs": "f099664b5fe70803cb30c692ec7eff9c9302675d4ec0cd24d050fca55e062201",
+    "gf-linalg/src/coefficients.rs": "6cb8453515275366398ab03feb78f9acc672cbf75fa7bf6119815fdca9f0c572",
+    "gf-linalg/src/error.rs": "5b52a54b7e87a36f86f1a76f36e93cd14b1f34bb3aeb2f34d31afaa11c559ab0",
+    "gf-linalg/src/field.rs": "7ad9d50ae2aa3cdf2656b9e89e3eb8e7c6ed2e4a60e4f704039261aa6fad94cd",
+    "gf-linalg/src/field_text.rs": "70779e28a7129f9684841e134a96b6e4935a283264e02e26e6613dede13e831c",
+    "gf-linalg/src/lib.rs": "0c0f71019192025fe4b15fa1aab82ae5721f85948fe63fecdee372ffb693be53",
+    "gf-linalg/src/linear_system.rs": "33ef3ed9c091dc9bdcd14aec8cb5c3ed573204660106d6b89dbd18c5e336d406",
+    "gf-linalg/src/matrix/arithmetic.rs": "4f20a88e1d77ab1fcc8e07232d43e82e196db342fea7e264bb82a4d20825d471",
+    "gf-linalg/src/matrix/elimination.rs": "fa78cc26b2fb1fa7617475beb14f659c443e6ae67edf7f11742bef302e0ade75",
+    "gf-linalg/src/matrix/mod.rs": "13d31e9f6f20c0808a6a1e759448e1c5a0b5ee55e7578dee986c70ca6c63bcdc",
+    "gf-linalg/src/matrix/operators.rs": "aaa2711895dd4b184e3bb5068aaad4cb889dd26a53ac9b654185e6510de16b08",
+    "gf-linalg/src/text.rs": "8371f74eded95a7d5cd3fe685f127c61b452e659a2817fef19a068b5f07b010b",
+    "gf-linalg/src/vector.rs": "120540fd871674a64ef8b4857caae9b22f64d3194235e422a4b6808b54fe6e26",
+    "gf-linalg/tests/coefficients.rs": "bb27301f74c39a465170715157cc2993938e0158f56295dc8d6167033b05f36c",
+    "gf-linalg/tests/common/mod.rs": "604fba28fad83563da0503a1aa8dbe780506a4537a08aad21d966ab5979c0b2b",
+    "gf-linalg/tests/errors.rs": "290c8229c3126e2ebb11b623ca96b08f520f2132d774e0691663446af01f7939",
+    "gf-linalg/tests/field.rs": "408025caeec9c813604cd94586c3c0ebca4412b00101ff3821b04e17757e7aff",
+    "gf-linalg/tests/generic.rs": "c12ad4fed31c16baa5f5f2752ca453892265ba1e2ccb8eb8c6ff16ac771edf6a",
+    "gf-linalg/tests/generic_matrix.rs": "3bcdb2a0e188d3bdfe5d83c53f474e12bde6e7f6c673df84fc13392ba6841c20",
+    "gf-linalg/tests/generic_vector.rs": "48c5db68dc718626ef9724d0fff777b0afcd13da519b1e7a307478b0ca772f05",
+    "gf-linalg/tests/linear_system.rs": "7f558559486282b465bc80022a3ed51de1c0eb635298a63ce8a18813956f0c2f",
+    "gf-linalg/tests/matrix/arithmetic.rs": "0113c3652e9cc238c5ec9678d279427bb805f96fbe6c7451f59a4758c9b6cabb",
+    "gf-linalg/tests/matrix/elimination.rs": "7946c9e00f5390fbf713176f3eef17192e36ed0ec2b4077c79270410c6eeb4f8",
+    "gf-linalg/tests/matrix/operators.rs": "a51984134a6083027f0ee0d92affd14ff38203dc775d2550ff1d6e6bacc4f856",
+    "gf-linalg/tests/matrix/storage.rs": "23e9e55ef896b83425facae3027f077c7caf610bba5a782460e3c7bae43b904b",
+    "gf-linalg/tests/matrix.rs": "cebc4a1ba09e8bd55a551b65de71057f40ba994db3c5d29de4a51db252f2285d",
+    "gf-linalg/tests/rref.rs": "bb6bc66a203c85c72d6fa680c56030d749e6db98f9d9c8724851e8a7529cbbc3",
+    "gf-linalg/tests/text/containers.rs": "3c5d8c398431f1a4af45a413503d8c84a1ecea9b515a1554fdfbf0bf49fe6bb2",
+    "gf-linalg/tests/text/field_tokens.rs": "5bbe632e1f64355c0ec3e09fbfe0196f0c6ce2a224a5b5919c054172ec0a8180",
+    "gf-linalg/tests/text.rs": "b601bfbdd678bb52add8191b9a98fc1efbe9982df5ddf0e374dc488c71f9ef7f",
+    "gf-linalg/tests/vector.rs": "5571c37a8e079a8957b821fdb93b731d702348d62aeb4729c232ac891ee58ba7",
+    "gf2m/benches/field.rs": "6e55775e981794ebb6085e4cd87f6e686ee79b3fa3b40fc22e457e03d0e6670c",
+    "gf2m/examples/arithmetic_gf2m.rs": "86930c85b37feaa7b5360f0b45bd9e5a2301633289fb2690e65558df6b2e87ba",
+    "gf2m/examples/gauss_gf2m.rs": "61653f5f39f7fc122991ebd393f83c11f8f4b8a7119f2e1e218258580ecf8c98",
+    "gf2m/src/error.rs": "07682559ee39400cf2041ac9ca3f80ac3e3174cbd8d1e3267964959b9a40d506",
+    "gf2m/src/gf.rs": "eeb25f19988eca8beb2f534910c1e3476432486f80939beab7f4c93e09a2b767",
+    "gf2m/src/lib.rs": "ddde468670deec9cb2f17b69724fe1b646b3887272f96c730608013efe6f896d",
+    "gf2m/src/poly.rs": "d8b9b575ec03bf514bae340d7fa5da03773b1c4726ab040b8d523a0b3d8a60d3",
+    "gf2m/src/runtime.rs": "e95a431dafdffd29a03f697648e126d225e42d3ebde48512137470f85515d73f",
+    "gf2m/src/tables.rs": "ef95ad326791640637f163ed17100b15c92b0d6bab0cccc5012dac7665f1ad4c",
+    "gf2m/tests/axioms.rs": "b3fa7b7d6a84fad301b01b24f302c78aaae33d8d441ff501ba0fd18d337adffe",
+    "gf2m/tests/cross_check.rs": "2949b0f5812fec310e88fdd6a4c77659bd3b4cb6949a49f6333d0cfe8baad47d",
+    "gf2m/tests/known_vectors.rs": "40106c288196ea21c4ee5afa5ec9feff698cf63dff8d311482c60784517a95e7",
+    "gf2m/tests/proptest_axioms.rs": "9643d58e1d6a4e82c615cb0de9421253ffe80da83c102c53d20177e83a367a8b",
+    "gf2m/tests/runtime.rs": "f9e2155c747e46c03a9e2230eef7e58bf41195d7424899ae329feac99e4f9505",
+    "gf2m/tests/safety.rs": "8d19dea3e7bbba8c6c3e2634a531e658a8d74f5277e83f4fb0bd4d9eba311aa5",
+    "gfpm/benches/field.rs": "e2f4c1e2e98f5dbd73dd64583610abf562df08940f120907cb62768ee148d24a",
+    "gfpm/examples/arithmetic_gfpm.rs": "45d5b3253b9a3da69daee5eb1c8a43753c444d036e2e8aeb73774d9ad5a15260",
+    "gfpm/examples/gauss_gfpm.rs": "cbb12a16913a46d413232a3064e6cc03f73945d2ab61e882e735ed6906189501",
+    "gfpm/src/error.rs": "eaf79e46c22a9d270da1502a219677ff6bf34152427f00c2ce61cca26a82ba86",
+    "gfpm/src/field.rs": "e752f56a13b95ec12cc48515192671655ff93cf489e97f6ca7c7dfc5f1ef6e49",
+    "gfpm/src/fp.rs": "29d97e204cbceb21958dc17bbadc604d81400827b2b4773c533895fb19b73298",
+    "gfpm/src/gf.rs": "2cd1c45cca52e3d5953580ca6a0fec7a14b8a37ea60422ae7ee8c6447d359a8f",
+    "gfpm/src/lib.rs": "92bf7c4938bc24940de36301e345106203bcc1b522f70fe9405e459f4dd69bef",
+    "gfpm/src/poly.rs": "c4ce619f487909ef6076014fb2c9b2e1e18f60e6e6758b5a342beb97d9e4f4eb",
+    "gfpm/src/runtime.rs": "3f0ce799e26d525c600f0fc02187047295c9a18bb3ad8c56ce60360f6fbfcd4f",
+    "gfpm/tests/axioms.rs": "353f12164175a5de01aa8a2ee87e1b10a84de1b90d6062501044aa4897954f07",
+    "gfpm/tests/cross_check.rs": "b8f2c536f7a7b28ee513a7fd3b5ac3e276da9da122589e7acc617e02c745fdbd",
+    "gfpm/tests/known_vectors.rs": "daebeeac3dee66780653ef44d5fa2d41618a189065cce7a9e08dddd5c58dce64",
+    "gfpm/tests/proptest_axioms.rs": "22d7e55d568ab3e3545f400a0bf38ae61d0e0536fa2367c1e548444bb02c4866",
+    "gfpm/tests/runtime.rs": "7a38752c1ad02ed20bb26072d6593de598005e7fe4a1479986897245e63dd095",
+    "gfpm/tests/safety.rs": "5d8e8ed0585da45edbd3069cca293441ade96abf254b223ba24e8fdbb0c6c926",
+    "tools/run_fountain_experiments.py": "47d89ef834cdb65b83d81eb3cbe05292c71408fa6de8a3dbbb6cad1ef9b98f64"
+  },
+  "cases": [
+    {
+      "name": "gf256-k12-c4-sample",
+      "raw": "gf256-k12-c4-sample.csv",
+      "status": 0,
+      "summary": {
+        "observations": 6,
+        "instances": 2,
+        "decode_success": 6,
+        "insufficient_rank": 0,
+        "local_success": 5,
+        "first_complete_histogram": {
+          "12": 6
+        },
+        "read_symbols_histogram_successful_repairs": {
+          "5": 1,
+          "6": 1,
+          "7": 2,
+          "8": 1
+        },
+        "read_payload_bytes_total": 33,
+        "greedy_group_count_histogram": {
+          "0": 1,
+          "1": 5
+        },
+        "decode_nanoseconds_total": 94274,
+        "repair_nanoseconds_total": 9878,
+        "decoder_logical_bytes_max": 2167,
+        "payload_to_source_ratio_mean": 1.1666666666666667,
+        "wire_to_source_ratio_mean": 79.83333333333333,
+        "per_instance": {
+          "0": {
+            "observations": 3,
+            "code_seed": "13679457532755275413",
+            "decode_success": 3,
+            "repair_success": 2
+          },
+          "1": {
+            "observations": 3,
+            "code_seed": "701532786141963250",
+            "decode_success": 3,
+            "repair_success": 3
+          }
+        },
+        "confidence_intervals": "Not estimated; trials are clustered by code instance. No article-scale statistical claim."
+      }
+    },
+    {
+      "name": "gf256-k12-c4-loss",
+      "raw": "gf256-k12-c4-loss.csv",
+      "status": 0,
+      "summary": {
+        "observations": 6,
+        "instances": 2,
+        "decode_success": 6,
+        "insufficient_rank": 0,
+        "local_success": 3,
+        "first_complete_histogram": {
+          "12": 6
+        },
+        "read_symbols_histogram_successful_repairs": {
+          "6": 3
+        },
+        "read_payload_bytes_total": 18,
+        "greedy_group_count_histogram": {
+          "0": 3,
+          "1": 3
+        },
+        "decode_nanoseconds_total": 100746,
+        "repair_nanoseconds_total": 6613,
+        "decoder_logical_bytes_max": 2365,
+        "payload_to_source_ratio_mean": 1.3472222222222223,
+        "wire_to_source_ratio_mean": 91.56944444444444,
+        "per_instance": {
+          "0": {
+            "observations": 3,
+            "code_seed": "13679457532755275413",
+            "decode_success": 3,
+            "repair_success": 2
+          },
+          "1": {
+            "observations": 3,
+            "code_seed": "701532786141963250",
+            "decode_success": 3,
+            "repair_success": 1
+          }
+        },
+        "confidence_intervals": "Not estimated; trials are clustered by code instance. No article-scale statistical claim."
+      }
+    },
+    {
+      "name": "gf65536-k12-c4-sample",
+      "raw": "gf65536-k12-c4-sample.csv",
+      "status": 0,
+      "summary": {
+        "observations": 6,
+        "instances": 2,
+        "decode_success": 6,
+        "insufficient_rank": 0,
+        "local_success": 5,
+        "first_complete_histogram": {
+          "12": 6
+        },
+        "read_symbols_histogram_successful_repairs": {
+          "5": 1,
+          "6": 1,
+          "7": 2,
+          "8": 1
+        },
+        "read_payload_bytes_total": 66,
+        "greedy_group_count_histogram": {
+          "0": 1,
+          "1": 5
+        },
+        "decode_nanoseconds_total": 151710,
+        "repair_nanoseconds_total": 12284,
+        "decoder_logical_bytes_max": 2194,
+        "payload_to_source_ratio_mean": 1.1666666666666667,
+        "wire_to_source_ratio_mean": 40.5,
+        "per_instance": {
+          "0": {
+            "observations": 3,
+            "code_seed": "13679457532755275413",
+            "decode_success": 3,
+            "repair_success": 2
+          },
+          "1": {
+            "observations": 3,
+            "code_seed": "701532786141963250",
+            "decode_success": 3,
+            "repair_success": 3
+          }
+        },
+        "confidence_intervals": "Not estimated; trials are clustered by code instance. No article-scale statistical claim."
+      }
+    },
+    {
+      "name": "gf65536-k12-c4-loss",
+      "raw": "gf65536-k12-c4-loss.csv",
+      "status": 0,
+      "summary": {
+        "observations": 6,
+        "instances": 2,
+        "decode_success": 6,
+        "insufficient_rank": 0,
+        "local_success": 3,
+        "first_complete_histogram": {
+          "12": 6
+        },
+        "read_symbols_histogram_successful_repairs": {
+          "6": 3
+        },
+        "read_payload_bytes_total": 36,
+        "greedy_group_count_histogram": {
+          "0": 3,
+          "1": 3
+        },
+        "decode_nanoseconds_total": 150078,
+        "repair_nanoseconds_total": 8225,
+        "decoder_logical_bytes_max": 2398,
+        "payload_to_source_ratio_mean": 1.3472222222222223,
+        "wire_to_source_ratio_mean": 46.458333333333336,
+        "per_instance": {
+          "0": {
+            "observations": 3,
+            "code_seed": "13679457532755275413",
+            "decode_success": 3,
+            "repair_success": 2
+          },
+          "1": {
+            "observations": 3,
+            "code_seed": "701532786141963250",
+            "decode_success": 3,
+            "repair_success": 1
+          }
+        },
+        "confidence_intervals": "Not estimated; trials are clustered by code instance. No article-scale statistical claim."
+      }
+    }
+  ]
+}

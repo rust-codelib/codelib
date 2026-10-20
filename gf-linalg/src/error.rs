@@ -10,6 +10,29 @@ use core::fmt;
 /// функции с результатом `Result<_, LinalgError>`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinalgError {
+    /// Число неизвестных или ширина правой части вне `1..=MAX_MATRIX_DIM`.
+    InvalidLinearSystemDimensions {
+        /// Число неизвестных.
+        unknowns: usize,
+        /// Число правых частей.
+        rhs_columns: usize,
+    },
+    /// Число коэффициентов уравнения не совпадает с числом неизвестных.
+    EquationCoefficientCountMismatch {
+        /// Ожидаемое число коэффициентов.
+        expected: usize,
+        /// Переданное число коэффициентов.
+        actual: usize,
+    },
+    /// Ширина правой части уравнения не совпадает с шириной системы.
+    EquationRhsCountMismatch {
+        /// Ожидаемое число правых частей.
+        expected: usize,
+        /// Переданное число правых частей.
+        actual: usize,
+    },
+    /// Размер рабочего буфера переполняет `usize` или превышает `isize::MAX` байт.
+    SizeOverflow,
     /// Размеры матрицы недопустимы.
     InvalidDimensions {
         /// Число строк.
@@ -161,6 +184,19 @@ pub enum LinalgError {
 impl fmt::Display for LinalgError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InvalidLinearSystemDimensions { unknowns, rhs_columns } => write!(
+                f,
+                "недопустимые размеры системы: неизвестных {unknowns}, правых частей {rhs_columns}"
+            ),
+            Self::EquationCoefficientCountMismatch { expected, actual } => write!(
+                f,
+                "неверное число коэффициентов уравнения: ожидалось {expected}, получено {actual}"
+            ),
+            Self::EquationRhsCountMismatch { expected, actual } => write!(
+                f,
+                "неверное число правых частей уравнения: ожидалось {expected}, получено {actual}"
+            ),
+            Self::SizeOverflow => write!(f, "переполнение размера рабочего буфера"),
             Self::InvalidDimensions { rows, cols } => {
                 write!(f, "недопустимые размеры матрицы: {rows} × {cols}")
             }

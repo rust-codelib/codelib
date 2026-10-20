@@ -6,6 +6,7 @@ mod coefficients;
 mod error;
 mod field;
 mod field_text;
+mod linear_system;
 mod matrix;
 mod text;
 mod vector;
@@ -14,6 +15,7 @@ pub use coefficients::MAX_POLYNOMIAL_BYTES;
 pub use error::LinalgError;
 pub use field::FieldElement;
 pub use field_text::FieldText;
+pub use linear_system::{EquationInsertion, LinearSystem};
 pub use matrix::{Matrix, RrefResult};
 pub use vector::Vector;
 

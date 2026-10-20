@@ -1,0 +1,15 @@
+[package]
+name = "coding-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Typed, allocation-free contracts for encoders, decoders and repair"
+
+[dev-dependencies]
+gf2m = { path = "../gf2m", version = "1.0.0" }
+
+[[example]]
+name = "buffers"
+crate-type = ["lib"]
