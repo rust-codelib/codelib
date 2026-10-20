@@ -349,6 +349,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "kerdock-codes"
+version = "0.1.0"
+dependencies = [
+ "gf2m",
+]
+
+[[package]]
 name = "ldpc-codes"
 version = "0.1.0"
 dependencies = [

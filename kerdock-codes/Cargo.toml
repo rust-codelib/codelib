@@ -1,0 +1,11 @@
+[package]
+name = "kerdock-codes"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Двоичные коды Кердока с параметризованной длиной блока"
+
+[dependencies]
+gf2m = { path = "../gf2m", version = "1.0.0" }
