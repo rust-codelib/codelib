@@ -1,0 +1,16 @@
+[package]
+name = "fountain-codes"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Systematic repairable fountain codes, deterministic wire v1 and local repair"
+
+[dependencies]
+coding-core = { path = "../coding-core", version = "0.1.0" }
+gf2m = { path = "../gf2m", version = "1.0.0" }
+gf-linalg = { path = "../gf-linalg", version = "0.1.0" }
+
+[dev-dependencies]
+serde_json = "1"

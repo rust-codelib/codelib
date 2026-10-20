@@ -1,0 +1,900 @@
+{
+  "spec": "codelib-repairable-fountain-v1",
+  "splitmix64": {
+    "initial_state_hex": "0000000000000000",
+    "words_hex": [
+      "e220a8397b1dcdaf",
+      "6e789e6aa1b965f4",
+      "06c45d188009454f",
+      "f88bb8a8724c81ec",
+      "1b39896a51a8749b",
+      "53cb9f0c747ea2ea",
+      "2c829abe1f4532e1",
+      "c584133ac916ab3c"
+    ]
+  },
+  "rejection_sampling": {
+    "k": 3,
+    "threshold": 1,
+    "input_words_hex": [
+      "0000000000000000",
+      "0000000000000001",
+      "0000000000000002",
+      "ffffffffffffffff"
+    ],
+    "accepted_indices": [
+      1,
+      2,
+      0
+    ],
+    "rejected_words": 1
+  },
+  "zero_parity": {
+    "profile": 2,
+    "k": 1,
+    "d": 1,
+    "id": "1",
+    "seed_hex": "0000000000000224",
+    "index_initial_state": "3ec26cfb0a76d61f",
+    "coefficient_initial_state": "58551e6940ccdbfe",
+    "index_words": [
+      "cabe5e3d6501e4f4"
+    ],
+    "draws": [
+      0
+    ],
+    "distinct_indices": [
+      0
+    ],
+    "coefficient_words": [
+      "3fccd8c539033a00"
+    ],
+    "support": [],
+    "payload_hex": "00"
+  },
+  "empty_descriptor_hex": "524643440100010000000000000000000000000000000000000040000000000000000000000000002d00010000000000",
+  "messages": [
+    {
+      "name": "gf256_three_parts",
+      "profile": 2,
+      "width": 1,
+      "n": 5,
+      "t": 2,
+      "k": 3,
+      "l": 2,
+      "seed_hex": "0123456789abcdef",
+      "d": 5,
+      "block_id_hex": "000102030405060708090a0b0c0d0e0f",
+      "message_hex": "80ff341200",
+      "padded_hex": "80ff34120000",
+      "source_values": [
+        [
+          128,
+          255
+        ],
+        [
+          52,
+          18
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "descriptor_hex": "5246434401000200000102030405060708090a0b0c0d0e0f0500020003000500efcdab89674523011d01000000000000",
+      "symbols": [
+        {
+          "id": "0",
+          "support": [
+            [
+              0,
+              1
+            ]
+          ],
+          "values": [
+            128,
+            255
+          ],
+          "payload_hex": "80ff",
+          "packet_hex": "524643535246434401000200000102030405060708090a0b0c0d0e0f0500020003000500efcdab89674523011d0100000000000000000000000000000200000080ff"
+        },
+        {
+          "id": "1",
+          "support": [
+            [
+              1,
+              1
+            ]
+          ],
+          "values": [
+            52,
+            18
+          ],
+          "payload_hex": "3412",
+          "packet_hex": "524643535246434401000200000102030405060708090a0b0c0d0e0f0500020003000500efcdab89674523011d010000000000000100000000000000020000003412"
+        },
+        {
+          "id": "2",
+          "support": [
+            [
+              2,
+              1
+            ]
+          ],
+          "values": [
+            0,
+            0
+          ],
+          "payload_hex": "0000",
+          "packet_hex": "524643535246434401000200000102030405060708090a0b0c0d0e0f0500020003000500efcdab89674523011d010000000000000200000000000000020000000000"
+        },
+        {
+          "id": "3",
+          "index_initial_state": "0b480d179f7ee839",
+          "coefficient_initial_state": "ae2d92a23ef2123e",
+          "index_words": [
+            "3764bc778e317e5a",
+            "3527c22ad2c0e464",
+            "c5eda1e7d4774812",
+            "d5c26fa406f23d06",
+            "264037ec8c4ab7fc"
+          ],
+          "draws": [
+            2,
+            2,
+            2,
+            1,
+            1
+          ],
+          "distinct_indices": [
+            1,
+            2
+          ],
+          "coefficient_words": [
+            "88945b7ddfdb30b6",
+            "4210f2936ba30a65"
+          ],
+          "support": [
+            [
+              1,
+              182
+            ],
+            [
+              2,
+              101
+            ]
+          ],
+          "values": [
+            14,
+            222
+          ],
+          "payload_hex": "0ede",
+          "packet_hex": "524643535246434401000200000102030405060708090a0b0c0d0e0f0500020003000500efcdab89674523011d010000000000000300000000000000020000000ede"
+        },
+        {
+          "id": "4",
+          "index_initial_state": "552da1f369b39245",
+          "coefficient_initial_state": "115c22d9426f4f08",
+          "index_words": [
+            "5e5022397a44bd19",
+            "12193a9b14b0962e",
+            "bbcd56faa389381e",
+            "24cc3bfa03a86504",
+            "4f229bc446099daf"
+          ],
+          "draws": [
+            0,
+            0,
+            1,
+            0,
+            2
+          ],
+          "distinct_indices": [
+            0,
+            1,
+            2
+          ],
+          "coefficient_words": [
+            "48602cf7476575f2",
+            "5e26c041868f8a09",
+            "631693781a452680"
+          ],
+          "support": [
+            [
+              0,
+              242
+            ],
+            [
+              1,
+              9
+            ],
+            [
+              2,
+              128
+            ]
+          ],
+          "values": [
+            37,
+            239
+          ],
+          "payload_hex": "25ef",
+          "packet_hex": "524643535246434401000200000102030405060708090a0b0c0d0e0f0500020003000500efcdab89674523011d0100000000000004000000000000000200000025ef"
+        },
+        {
+          "id": "5",
+          "index_initial_state": "dd72964630ea2268",
+          "coefficient_initial_state": "94561fcba0ff240a",
+          "index_words": [
+            "b3f59168edbcc559",
+            "ec1483cac9265bee",
+            "c712dce3017a1c22",
+            "71201efa7797f2d9",
+            "7238c63fb84915fa"
+          ],
+          "draws": [
+            1,
+            2,
+            0,
+            2,
+            2
+          ],
+          "distinct_indices": [
+            0,
+            1,
+            2
+          ],
+          "coefficient_words": [
+            "56decb6f685a0fd7",
+            "f0899e61d1a22a4e",
+            "8dda59709049647e"
+          ],
+          "support": [
+            [
+              0,
+              215
+            ],
+            [
+              1,
+              78
+            ],
+            [
+              2,
+              126
+            ]
+          ],
+          "values": [
+            95,
+            215
+          ],
+          "payload_hex": "5fd7",
+          "packet_hex": "524643535246434401000200000102030405060708090a0b0c0d0e0f0500020003000500efcdab89674523011d010000000000000500000000000000020000005fd7"
+        },
+        {
+          "id": "18446744073709551615",
+          "index_initial_state": "c130c3c94a47aa42",
+          "coefficient_initial_state": "3d45a884fdc5b0ee",
+          "index_words": [
+            "2950885732459f89",
+            "f951dee333fe6b99",
+            "e767fc43a397720b",
+            "8c7d7e8eae48e409",
+            "86f3920c1d26eaf8"
+          ],
+          "draws": [
+            0,
+            0,
+            0,
+            2,
+            1
+          ],
+          "distinct_indices": [
+            0,
+            1,
+            2
+          ],
+          "coefficient_words": [
+            "cdab6e4ed0908123",
+            "e2728d4e88401d69",
+            "81b7d3ad4376da49"
+          ],
+          "support": [
+            [
+              0,
+              35
+            ],
+            [
+              1,
+              105
+            ],
+            [
+              2,
+              73
+            ]
+          ],
+          "values": [
+            150,
+            134
+          ],
+          "payload_hex": "9686",
+          "packet_hex": "524643535246434401000200000102030405060708090a0b0c0d0e0f0500020003000500efcdab89674523011d01000000000000ffffffffffffffff020000009686"
+        }
+      ],
+      "global_recovery": {
+        "ids": [
+          "3",
+          "4",
+          "5"
+        ],
+        "coefficient_rows": [
+          [
+            0,
+            182,
+            101
+          ],
+          [
+            242,
+            9,
+            128
+          ],
+          [
+            215,
+            78,
+            126
+          ]
+        ],
+        "rhs": [
+          [
+            14,
+            222
+          ],
+          [
+            37,
+            239
+          ],
+          [
+            95,
+            215
+          ]
+        ],
+        "rank": 3,
+        "solution": [
+          [
+            128,
+            255
+          ],
+          [
+            52,
+            18
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "insertion_pivot_columns": [
+          1,
+          0,
+          2
+        ],
+        "message_hex": "80ff341200"
+      },
+      "local_repair": {
+        "target": "0",
+        "parity_id": "4",
+        "helpers_and_weights": [
+          [
+            "1",
+            116
+          ],
+          [
+            "2",
+            140
+          ],
+          [
+            "4",
+            181
+          ]
+        ],
+        "payload_hex": "80ff",
+        "read_symbols": 3,
+        "read_payload_bytes": 6
+      }
+    },
+    {
+      "name": "gf65536_odd_message",
+      "profile": 1,
+      "width": 2,
+      "n": 11,
+      "t": 4,
+      "k": 3,
+      "l": 2,
+      "seed_hex": "0123456789abcdef",
+      "d": 5,
+      "block_id_hex": "000102030405060708090a0b0c0d0e0f",
+      "message_hex": "8001ff0034120080aa55cc",
+      "padded_hex": "8001ff0034120080aa55cc00",
+      "source_values": [
+        [
+          384,
+          255
+        ],
+        [
+          4660,
+          32768
+        ],
+        [
+          21930,
+          204
+        ]
+      ],
+      "descriptor_hex": "5246434401000100000102030405060708090a0b0c0d0e0f0b00040003000500efcdab89674523012d00010000000000",
+      "symbols": [
+        {
+          "id": "0",
+          "support": [
+            [
+              0,
+              1
+            ]
+          ],
+          "values": [
+            384,
+            255
+          ],
+          "payload_hex": "8001ff00",
+          "packet_hex": "524643535246434401000100000102030405060708090a0b0c0d0e0f0b00040003000500efcdab89674523012d000100000000000000000000000000040000008001ff00"
+        },
+        {
+          "id": "1",
+          "support": [
+            [
+              1,
+              1
+            ]
+          ],
+          "values": [
+            4660,
+            32768
+          ],
+          "payload_hex": "34120080",
+          "packet_hex": "524643535246434401000100000102030405060708090a0b0c0d0e0f0b00040003000500efcdab89674523012d0001000000000001000000000000000400000034120080"
+        },
+        {
+          "id": "2",
+          "support": [
+            [
+              2,
+              1
+            ]
+          ],
+          "values": [
+            21930,
+            204
+          ],
+          "payload_hex": "aa55cc00",
+          "packet_hex": "524643535246434401000100000102030405060708090a0b0c0d0e0f0b00040003000500efcdab89674523012d00010000000000020000000000000004000000aa55cc00"
+        },
+        {
+          "id": "3",
+          "index_initial_state": "0b480d179f7ee839",
+          "coefficient_initial_state": "ae2d92a23ef2123e",
+          "index_words": [
+            "3764bc778e317e5a",
+            "3527c22ad2c0e464",
+            "c5eda1e7d4774812",
+            "d5c26fa406f23d06",
+            "264037ec8c4ab7fc"
+          ],
+          "draws": [
+            2,
+            2,
+            2,
+            1,
+            1
+          ],
+          "distinct_indices": [
+            1,
+            2
+          ],
+          "coefficient_words": [
+            "88945b7ddfdb30b6",
+            "4210f2936ba30a65"
+          ],
+          "support": [
+            [
+              1,
+              12470
+            ],
+            [
+              2,
+              2661
+            ]
+          ],
+          "values": [
+            10825,
+            24903
+          ],
+          "payload_hex": "492a4761",
+          "packet_hex": "524643535246434401000100000102030405060708090a0b0c0d0e0f0b00040003000500efcdab89674523012d00010000000000030000000000000004000000492a4761"
+        },
+        {
+          "id": "4",
+          "index_initial_state": "552da1f369b39245",
+          "coefficient_initial_state": "115c22d9426f4f08",
+          "index_words": [
+            "5e5022397a44bd19",
+            "12193a9b14b0962e",
+            "bbcd56faa389381e",
+            "24cc3bfa03a86504",
+            "4f229bc446099daf"
+          ],
+          "draws": [
+            0,
+            0,
+            1,
+            0,
+            2
+          ],
+          "distinct_indices": [
+            0,
+            1,
+            2
+          ],
+          "coefficient_words": [
+            "48602cf7476575f2",
+            "5e26c041868f8a09",
+            "631693781a452680"
+          ],
+          "support": [
+            [
+              0,
+              30194
+            ],
+            [
+              1,
+              35337
+            ],
+            [
+              2,
+              9856
+            ]
+          ],
+          "values": [
+            25934,
+            37814
+          ],
+          "payload_hex": "4e65b693",
+          "packet_hex": "524643535246434401000100000102030405060708090a0b0c0d0e0f0b00040003000500efcdab89674523012d000100000000000400000000000000040000004e65b693"
+        },
+        {
+          "id": "5",
+          "index_initial_state": "dd72964630ea2268",
+          "coefficient_initial_state": "94561fcba0ff240a",
+          "index_words": [
+            "b3f59168edbcc559",
+            "ec1483cac9265bee",
+            "c712dce3017a1c22",
+            "71201efa7797f2d9",
+            "7238c63fb84915fa"
+          ],
+          "draws": [
+            1,
+            2,
+            0,
+            2,
+            2
+          ],
+          "distinct_indices": [
+            0,
+            1,
+            2
+          ],
+          "coefficient_words": [
+            "56decb6f685a0fd7",
+            "f0899e61d1a22a4e",
+            "8dda59709049647e"
+          ],
+          "support": [
+            [
+              0,
+              4055
+            ],
+            [
+              1,
+              10830
+            ],
+            [
+              2,
+              25726
+            ]
+          ],
+          "values": [
+            47720,
+            37504
+          ],
+          "payload_hex": "68ba8092",
+          "packet_hex": "524643535246434401000100000102030405060708090a0b0c0d0e0f0b00040003000500efcdab89674523012d0001000000000005000000000000000400000068ba8092"
+        },
+        {
+          "id": "18446744073709551615",
+          "index_initial_state": "c130c3c94a47aa42",
+          "coefficient_initial_state": "3d45a884fdc5b0ee",
+          "index_words": [
+            "2950885732459f89",
+            "f951dee333fe6b99",
+            "e767fc43a397720b",
+            "8c7d7e8eae48e409",
+            "86f3920c1d26eaf8"
+          ],
+          "draws": [
+            0,
+            0,
+            0,
+            2,
+            1
+          ],
+          "distinct_indices": [
+            0,
+            1,
+            2
+          ],
+          "coefficient_words": [
+            "cdab6e4ed0908123",
+            "e2728d4e88401d69",
+            "81b7d3ad4376da49"
+          ],
+          "support": [
+            [
+              0,
+              33059
+            ],
+            [
+              1,
+              7529
+            ],
+            [
+              2,
+              55881
+            ]
+          ],
+          "values": [
+            25359,
+            32425
+          ],
+          "payload_hex": "0f63a97e",
+          "packet_hex": "524643535246434401000100000102030405060708090a0b0c0d0e0f0b00040003000500efcdab89674523012d00010000000000ffffffffffffffff040000000f63a97e"
+        }
+      ],
+      "global_recovery": {
+        "ids": [
+          "3",
+          "4",
+          "5"
+        ],
+        "coefficient_rows": [
+          [
+            0,
+            12470,
+            2661
+          ],
+          [
+            30194,
+            35337,
+            9856
+          ],
+          [
+            4055,
+            10830,
+            25726
+          ]
+        ],
+        "rhs": [
+          [
+            10825,
+            24903
+          ],
+          [
+            25934,
+            37814
+          ],
+          [
+            47720,
+            37504
+          ]
+        ],
+        "rank": 3,
+        "solution": [
+          [
+            384,
+            255
+          ],
+          [
+            4660,
+            32768
+          ],
+          [
+            21930,
+            204
+          ]
+        ],
+        "insertion_pivot_columns": [
+          1,
+          0,
+          2
+        ],
+        "message_hex": "8001ff0034120080aa55cc"
+      },
+      "local_repair": {
+        "target": "0",
+        "parity_id": "4",
+        "helpers_and_weights": [
+          [
+            "1",
+            11899
+          ],
+          [
+            "2",
+            12314
+          ],
+          [
+            "4",
+            13203
+          ]
+        ],
+        "payload_hex": "8001ff00",
+        "read_symbols": 3,
+        "read_payload_bytes": 12
+      }
+    }
+  ],
+  "resource_cases": [
+    {
+      "n": 4096,
+      "t": 64,
+      "width": 2,
+      "d": 16,
+      "k": 64,
+      "l": 32,
+      "rank": 64,
+      "unique_symbols": 64,
+      "catalog_entries": 0,
+      "catalog_edges": 0,
+      "scratch_bytes": 1024,
+      "encoder_bytes": 5168,
+      "decoder_bytes": 31792,
+      "catalog_bytes": 5168
+    },
+    {
+      "n": 4096,
+      "t": 1,
+      "width": 1,
+      "d": 256,
+      "k": 4096,
+      "l": 1,
+      "rank": 4096,
+      "unique_symbols": 16384,
+      "catalog_entries": 16384,
+      "catalog_edges": 1048576,
+      "scratch_bytes": 16581,
+      "encoder_bytes": 24821,
+      "decoder_bytes": 34394357,
+      "catalog_bytes": 51658997
+    },
+    {
+      "n": 4096,
+      "t": 2,
+      "width": 2,
+      "d": 256,
+      "k": 2048,
+      "l": 1,
+      "rank": 2048,
+      "unique_symbols": 16384,
+      "catalog_entries": 0,
+      "catalog_edges": 0,
+      "scratch_bytes": 12486,
+      "encoder_bytes": 16630,
+      "decoder_bytes": 9101558,
+      "catalog_bytes": 143606
+    },
+    {
+      "n": 4096,
+      "t": 4096,
+      "width": 1,
+      "d": 256,
+      "k": 1,
+      "l": 4096,
+      "rank": 1,
+      "unique_symbols": 16384,
+      "catalog_entries": 0,
+      "catalog_edges": 0,
+      "scratch_bytes": 24786,
+      "encoder_bytes": 33026,
+      "decoder_bytes": 67678532,
+      "catalog_bytes": 24898
+    },
+    {
+      "n": 4096,
+      "t": 64,
+      "width": 2,
+      "d": 16,
+      "k": 64,
+      "l": 32,
+      "rank": 0,
+      "unique_symbols": 0,
+      "catalog_entries": 0,
+      "catalog_edges": 0,
+      "scratch_bytes": 1024,
+      "encoder_bytes": 5168,
+      "decoder_bytes": 25648,
+      "catalog_bytes": 5168
+    }
+  ],
+  "odd_characteristic_system": {
+    "field": "GF(5)",
+    "unknowns": 2,
+    "rhs_columns": 2,
+    "equations": [
+      {
+        "a": [
+          1,
+          1
+        ],
+        "rhs": [
+          1,
+          3
+        ],
+        "result": "Independent",
+        "pivot_column": 0,
+        "rank": 1
+      },
+      {
+        "a": [
+          2,
+          1
+        ],
+        "rhs": [
+          3,
+          3
+        ],
+        "result": "Independent",
+        "pivot_column": 1,
+        "rank": 2
+      },
+      {
+        "a": [
+          3,
+          2
+        ],
+        "rhs": [
+          4,
+          1
+        ],
+        "result": "Dependent",
+        "rank": 2
+      },
+      {
+        "a": [
+          3,
+          2
+        ],
+        "rhs": [
+          4,
+          2
+        ],
+        "result": "Inconsistent",
+        "rhs_column": 1,
+        "rank": 2
+      }
+    ],
+    "solution": [
+      [
+        2,
+        0
+      ],
+      [
+        4,
+        3
+      ]
+    ]
+  }
+}
