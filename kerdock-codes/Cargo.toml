@@ -9,3 +9,6 @@ description = "Двоичные коды Кердока с параметриз�
 
 [dependencies]
 gf2m = { path = "../gf2m", version = "1.0.0" }
+
+[dev-dependencies]
+proptest.workspace = true
