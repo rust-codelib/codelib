@@ -8,7 +8,7 @@ pub(crate) struct QuadraticTable {
 }
 
 impl QuadraticTable {
-    /// Accepts only an exponent already validated by Kerdock::try_new.
+    /// Accepts only a supported exponent selected by Kerdock::new.
     pub(crate) fn new(m: u32) -> Self {
         debug_assert!((4..=10).contains(&m) && m % 2 == 0);
         let s = m - 1;

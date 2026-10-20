@@ -1,7 +1,7 @@
 mod common;
 
 use common::{message, reference_word};
-use kerdock_codes::{Kerdock, KerdockError};
+use kerdock_codes::{Kerdock, KerdockError, KerdockSize};
 
 fn pack(word: &[bool]) -> u64 {
     assert!(word.len() <= 64);
@@ -12,7 +12,7 @@ fn pack(word: &[bool]) -> u64 {
 
 #[test]
 fn every_length16_received_word_matches_independent_nearest_search() {
-    let code = Kerdock::try_new(4).unwrap();
+    let code = Kerdock::new(KerdockSize::Bits16);
     let mut candidates = Vec::new();
     for a in 0..8 {
         for b in 0..16 {
@@ -68,7 +68,7 @@ fn every_length16_received_word_matches_independent_nearest_search() {
 
 #[test]
 fn length64_selected_inputs_match_independent_exhaustive_oracle() {
-    let code = Kerdock::try_new(6).unwrap();
+    let code = Kerdock::new(KerdockSize::Bits64);
     let mut candidates = Vec::new();
     for a in 0..32 {
         for b in 0..64 {

@@ -16,10 +16,10 @@ cargo run -p kerdock-codes --example round_trip
 12-битное сообщение и исправляет 13 различных позиций в 64-битном блоке:
 
 ```rust
-use kerdock_codes::{Kerdock, KerdockError};
+use kerdock_codes::{Kerdock, KerdockError, KerdockSize};
 
 fn main() -> Result<(), KerdockError> {
-    let codec = Kerdock::try_new(6)?;
+    let codec = Kerdock::new(KerdockSize::Bits64);
     // a = 5 (5 bits), b = 19 (6 bits), c = 1; least-significant bit first.
     let message = [
         true, false, true, false, false, true, true, false, false, true, false, true,
@@ -65,9 +65,16 @@ fn main() -> Result<(), KerdockError> {
 Кодирование не систематическое: сообщение нельзя просто прочитать из префикса
 слова. Для извлечения служит `extract_message`.
 
+Размер задаётся вариантами `KerdockSize::{Bits16, Bits64, Bits256, Bits1024}`.
+Для длины, известной во время выполнения, используйте
+`Kerdock::new(KerdockSize::try_from(bit_length)?)`: преобразование принимает
+длину кодового слова **в битах**, не показатель `m` и не число байтов.
+Конструктор `Kerdock::new` не возвращает ошибку параметра.
+
 | API | Назначение |
 | --- | --- |
-| `Kerdock::try_new(m) -> Result<Kerdock, KerdockError>` | Подготовить неизменяемый кодек |
+| `Kerdock::new(size: KerdockSize) -> Kerdock` | Подготовить неизменяемый кодек |
+| `KerdockSize::try_from(bit_length: usize) -> Result<KerdockSize, KerdockError>` | Проверить длину кодового слова в битах |
 | `exponent() -> u32` | Показатель `m` |
 | `message_len()`, `codeword_len() -> usize` | Длины `k`, `n` |
 | `minimum_distance()`, `correction_radius() -> usize` | Параметры `d`, `t` |
@@ -175,7 +182,7 @@ word[j] = Q_a(j) XOR parity(b & j) XOR c.
 
 | Вариант | Причина |
 | --- | --- |
-| `UnsupportedExponent { m }` | `m` не является чётным в `4..=10`; проверяется до сдвигов и выделений |
+| `UnsupportedBlockLength { bits }` | Длина в битах не равна 16, 64, 256 или 1024; возвращается из `KerdockSize::try_from` |
 | `MessageLengthMismatch { expected, actual }` | Длина сообщения не равна `k` |
 | `WordLengthMismatch { expected, actual }` | Длина входа `decode`/`extract_message` не равна `n` |
 | `InvalidCodeword` | Точное извлечение получило слово вне кода |

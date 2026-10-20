@@ -3,10 +3,10 @@ use std::fmt;
 /// Parameter and single-block processing errors for Kerdock codes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KerdockError {
-    /// The length exponent is not an even value in the supported range `4..=10`.
-    UnsupportedExponent {
-        /// The supplied length exponent.
-        m: u32,
+    /// The codeword bit length is not 16, 64, 256, or 1024.
+    UnsupportedBlockLength {
+        /// The supplied codeword length in bits.
+        bits: usize,
     },
     /// The message length is not `2m`.
     MessageLengthMismatch {
@@ -36,10 +36,10 @@ pub enum KerdockError {
 impl fmt::Display for KerdockError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnsupportedExponent { m } => {
+            Self::UnsupportedBlockLength { bits } => {
                 write!(
                     f,
-                    "неподдерживаемый показатель длины {m}: требуется чётный m от 4 до 10"
+                    "unsupported block length {bits} bits: expected 16, 64, 256, or 1024 bits"
                 )
             }
             Self::MessageLengthMismatch { expected, actual } => {

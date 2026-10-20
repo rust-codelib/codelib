@@ -7,10 +7,10 @@
 //! # Example: one block with 13 errors
 //!
 //! ```
-//! use kerdock_codes::{Kerdock, KerdockError};
+//! use kerdock_codes::{Kerdock, KerdockError, KerdockSize};
 //!
 //! # fn main() -> Result<(), KerdockError> {
-//! let codec = Kerdock::try_new(6)?;
+//! let codec = Kerdock::new(KerdockSize::Bits64);
 //! // a = 5 (5 bits), b = 19 (6 bits), c = 1; least-significant bit first.
 //! let message = [
 //!     true, false, true, false, false, true, true, false, false, true, false, true,
@@ -43,6 +43,10 @@
 //! the returned word, not the error count relative to the unknown transmitted
 //! word. On rejection, [`KerdockError::NoCodewordWithinRadius`] contains the
 //! actual nearest distance; ties outside the radius are also rejected.
+//!
+//! Select a codeword bit length with [`KerdockSize`]. For a runtime bit length,
+//! use `KerdockSize::try_from(bit_length)?` before calling [`Kerdock::new`];
+//! the conversion takes neither an exponent nor a byte count.
 //!
 //! # Resources
 //!
@@ -85,11 +89,13 @@ mod decode;
 mod encode;
 mod error;
 mod quadratic;
+mod size;
 mod walsh;
 
 pub use decode::DecodeResult;
 pub use error::KerdockError;
 use quadratic::QuadraticTable;
+pub use size::KerdockSize;
 
 /// An immutable, prepared binary Kerdock construction.
 ///
@@ -102,19 +108,14 @@ pub struct Kerdock {
 }
 
 impl Kerdock {
-    /// Prepares a length-`2^m` code carrying `2m` message bits.
-    ///
-    /// # Errors
-    /// Returns [`KerdockError::UnsupportedExponent`] unless `m` is even and
-    /// within `4..=10`. Validation precedes all size calculations.
-    pub fn try_new(m: u32) -> Result<Self, KerdockError> {
-        if !(4..=10).contains(&m) || m % 2 != 0 {
-            return Err(KerdockError::UnsupportedExponent { m });
-        }
-        Ok(Self {
+    /// Prepares a code with the selected codeword bit length.
+    #[must_use]
+    pub fn new(size: KerdockSize) -> Self {
+        let m = size.exponent();
+        Self {
             m,
             quadratics: QuadraticTable::new(m),
-        })
+        }
     }
 
     /// The binary block-length exponent `m`.

@@ -1,7 +1,7 @@
 mod common;
 
 use common::{message, reference_word};
-use kerdock_codes::Kerdock;
+use kerdock_codes::{Kerdock, KerdockSize};
 use proptest::prelude::*;
 use proptest::test_runner::{Config, TestRunner};
 use std::collections::BTreeSet;
@@ -21,7 +21,7 @@ fn check_recovery(code: &Kerdock, input: &[bool], positions: &BTreeSet<usize>) {
 
 fn check_size(m: u32) {
     // One prepared codec per exponent, reused by deterministic and random cases.
-    let code = Kerdock::try_new(m).unwrap();
+    let code = Kerdock::new(KerdockSize::try_from(1usize << m).unwrap());
     let n = code.codeword_len();
     let t = code.correction_radius();
     let input = message(m, (1 << (m - 1)) - 1, (1 << m) - 1, true);

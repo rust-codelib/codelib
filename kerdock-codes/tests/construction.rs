@@ -2,7 +2,7 @@ mod common;
 
 use common::{message, reference_word};
 use gf2m::GfRuntime;
-use kerdock_codes::Kerdock;
+use kerdock_codes::{Kerdock, KerdockSize};
 use std::collections::{BTreeMap, HashSet};
 
 #[test]
@@ -35,7 +35,7 @@ fn binary_rank(mut rows: Vec<u16>, columns: u32) -> usize {
 #[test]
 fn every_encoder_polar_difference_has_full_rank_at_every_size() {
     for m in [4, 6, 8, 10] {
-        let code = Kerdock::try_new(m).unwrap();
+        let code = Kerdock::new(KerdockSize::try_from(1usize << m).unwrap());
         let matrices: Vec<Vec<u16>> = (0..1 << (m - 1))
             .map(|a| {
                 let word = code.encode(&message(m, a, 0, false)).unwrap();
@@ -98,7 +98,7 @@ fn assert_nordstrom_robinson_parameters(words: &[u16]) {
 
 #[test]
 fn length16_codebook_has_exact_parameters_affine_subcode_and_is_nonlinear() {
-    let code = Kerdock::try_new(4).unwrap();
+    let code = Kerdock::new(KerdockSize::Bits16);
     let mut words = Vec::new();
     for a in 0..8 {
         for b in 0..16 {

@@ -1,12 +1,12 @@
 mod common;
 
 use common::{message, reference_word};
-use kerdock_codes::{Kerdock, KerdockError};
+use kerdock_codes::{Kerdock, KerdockError, KerdockSize};
 
 #[test]
 fn zero_message_encodes_to_exactly_one_zero_block() {
     for m in [4, 6, 8, 10] {
-        let code = Kerdock::try_new(m).unwrap();
+        let code = Kerdock::new(KerdockSize::try_from(1usize << m).unwrap());
         assert_eq!(
             code.encode(&vec![false; 2 * m as usize]).unwrap(),
             vec![false; 1 << m]
@@ -17,7 +17,7 @@ fn zero_message_encodes_to_exactly_one_zero_block() {
 #[test]
 fn changing_only_constant_complements_every_coordinate() {
     for m in [4, 6, 8, 10] {
-        let code = Kerdock::try_new(m).unwrap();
+        let code = Kerdock::new(KerdockSize::try_from(1usize << m).unwrap());
         let word = code.encode(&message(m, 3, 5, false)).unwrap();
         let complement = code.encode(&message(m, 3, 5, true)).unwrap();
         assert_eq!(complement, word.iter().map(|bit| !bit).collect::<Vec<_>>());
@@ -27,7 +27,7 @@ fn changing_only_constant_complements_every_coordinate() {
 #[test]
 fn encoding_rejects_empty_short_and_long_messages() {
     for m in [4, 6, 8, 10] {
-        let code = Kerdock::try_new(m).unwrap();
+        let code = Kerdock::new(KerdockSize::try_from(1usize << m).unwrap());
         let expected = 2 * m as usize;
         for actual in [0, expected - 1, expected + 1] {
             assert_eq!(
@@ -41,7 +41,7 @@ fn encoding_rejects_empty_short_and_long_messages() {
 #[test]
 fn nonzero_messages_match_independent_defining_form_without_mutating_input() {
     for m in [4, 6, 8, 10] {
-        let code = Kerdock::try_new(m).unwrap();
+        let code = Kerdock::new(KerdockSize::try_from(1usize << m).unwrap());
         for (a, b, c) in [
             (1, 3, false),
             (2, 5, true),
@@ -68,7 +68,7 @@ fn length_16_matches_manually_derived_coordinate_fixtures() {
     // Q_2(j) = j_0 j_1 + j_1 j_2 + j_2 j_3.
     // Coordinate j is bit j of the u16; parity(3 & j) has mask 0x6666.
     // These constants are derived from those monomials, not from the encoder.
-    let code = Kerdock::try_new(4).unwrap();
+    let code = Kerdock::new(KerdockSize::Bits16);
     for (a, b, c, expected) in [
         (1, 0, false, 0x6ac0),
         (1, 3, false, 0x0ca6),

@@ -1,7 +1,7 @@
-use kerdock_codes::{Kerdock, KerdockError};
+use kerdock_codes::{Kerdock, KerdockError, KerdockSize};
 
 fn main() -> Result<(), KerdockError> {
-    let codec = Kerdock::try_new(6)?;
+    let codec = Kerdock::new(KerdockSize::Bits64);
     // a = 5 (5 bits), b = 19 (6 bits), c = 1; least-significant bit first.
     let message = [
         true, false, true, false, false, true, true, false, false, true, false, true,
