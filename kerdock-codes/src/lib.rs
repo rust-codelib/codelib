@@ -4,6 +4,54 @@
 //! The code is nonlinear, and encoding is not guaranteed to be systematic.
 //! The minimum distance is `(n - 2^(m/2)) / 2`.
 //!
+//! # Example: one block with 13 errors
+//!
+//! ```
+//! use kerdock_codes::{Kerdock, KerdockError};
+//!
+//! # fn main() -> Result<(), KerdockError> {
+//! let codec = Kerdock::try_new(6)?;
+//! // a = 5 (5 bits), b = 19 (6 bits), c = 1; least-significant bit first.
+//! let message = [
+//!     true, false, true, false, false, true, true, false, false, true, false, true,
+//! ];
+//! let word = codec.encode(&message)?;
+//! assert_eq!(word.len(), 64);
+//! assert_eq!(codec.extract_message(&word)?, message);
+//!
+//! let positions = [0, 3, 7, 11, 16, 20, 25, 31, 38, 44, 50, 57, 63];
+//! assert_eq!(positions.len(), codec.correction_radius());
+//! let mut received = word.clone();
+//! for position in positions {
+//!     received[position] = !received[position];
+//! }
+//!
+//! let decoded = codec.decode(&received)?;
+//! assert_eq!(decoded.message(), message);
+//! assert_eq!(decoded.word(), word);
+//! assert_eq!(decoded.distance(), positions.len());
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! Input slices are unchanged, and results own their data. Each call handles
+//! one block; byte packing, padding, and stream processing are not provided.
+//! [`Kerdock::extract_message`] accepts only an exact codeword.
+//! [`Kerdock::decode`] guarantees recovery of the original message after at most
+//! `t = floor((d-1)/2)` bit flips. Beyond this radius, decoding may successfully
+//! return a different message. [`DecodeResult::distance`] measures distance to
+//! the returned word, not the error count relative to the unknown transmitted
+//! word. On rejection, [`KerdockError::NoCodewordWithinRadius`] contains the
+//! actual nearest distance; ties outside the radius are also rejected.
+//!
+//! # Resources
+//!
+//! Requires `std` and Rust 1.81+. Quadratic rows are packed into `u64` words:
+//! at `m=10`, the table contains 64 KiB of payload, excluding metadata and buffers.
+//! The full codebook is not constructed. Encoding takes `O(n)` work; integer
+//! FWHT search takes `O(n² log n)` operations and `O(n)` additional memory.
+//! The absolute values of `i32` transform entries are bounded by `n <= 1024`.
+//!
 //! # Bit ordering and construction
 //!
 //! A message contains `m-1` bits for field element `a`, then `m` bits for mask `b`
@@ -18,6 +66,8 @@
 //! Addition here is XOR. In the specified basis, choose
 //! `Q_a(w) = Σ_{i<j} B_a(e_i,e_j) w_i w_j` with no linear part.
 //! The codeword is `Q_a(j) XOR parity(b & j) XOR c`.
+//! The zero message produces the zero word; changing `c` complements the word.
+//! Coordinate and message ordering need not match Magma or GUAVA.
 //!
 //! The forms `B_a` are alternating. For `h = a+b != 0`, a vector `(x,u)`
 //! in the radical of `B_a+B_b` satisfies `Tr(hx)=0`,
