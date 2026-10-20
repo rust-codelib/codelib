@@ -31,10 +31,13 @@
 
 #![forbid(unsafe_code)]
 
+mod decode;
 mod encode;
 mod error;
 mod quadratic;
+mod walsh;
 
+pub use decode::DecodeResult;
 pub use error::KerdockError;
 use quadratic::QuadraticTable;
 
