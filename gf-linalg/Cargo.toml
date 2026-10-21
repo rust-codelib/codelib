@@ -8,6 +8,7 @@ repository.workspace = true
 description = "Линейная алгебра над статическими конечными полями"
 
 [dependencies]
+gf-poly = { path = "../gf-poly", version = "0.1.0" }
 gf2m = { path = "../gf2m", version = "1.0.0" }
 gfpm = { path = "../gfpm", version = "1.0.0" }
 

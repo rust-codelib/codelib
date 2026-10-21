@@ -4,16 +4,12 @@
 
 mod coefficients;
 mod error;
-mod field;
-mod field_text;
 mod matrix;
 mod text;
 mod vector;
 
-pub use coefficients::MAX_POLYNOMIAL_BYTES;
 pub use error::LinalgError;
-pub use field::FieldElement;
-pub use field_text::FieldText;
+pub use gf_poly::{FieldElement, FieldText, MAX_POLYNOMIAL_BYTES};
 pub use matrix::{Matrix, RrefResult};
 pub use vector::Vector;
 
