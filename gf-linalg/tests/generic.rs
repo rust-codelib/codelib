@@ -192,7 +192,15 @@ fn arithmetic_only_field_supports_linear_algebra_and_coefficient_conversion() {
 
     let coefficients = left.try_to_polynomial_coefficients().unwrap();
     assert_eq!(coefficients.as_ref(), left.as_slice());
-    assert_eq!(Vector::from_polynomial_coefficients(coefficients), left);
+    // Реализация FieldElement через прежний импорт gf_linalg подходит
+    // и полиномам из gf_poly; текстовый трейт для этого не требуется.
+    let polynomial = gf_poly::Polynomial::try_from(coefficients).unwrap();
+    assert_eq!(polynomial.degree(), Some(1));
+    assert_eq!(polynomial.coefficients(), left.as_slice());
+    assert_eq!(
+        Vector::from_polynomial_coefficients(polynomial.into_coefficients()),
+        left
+    );
 
     let rows = swap.try_to_polynomial_rows().unwrap();
     assert_eq!(Matrix::try_from_polynomial_rows(rows).unwrap(), swap);

@@ -266,6 +266,15 @@ dependencies = [
 name = "gf-linalg"
 version = "0.1.0"
 dependencies = [
+ "gf-poly",
+ "gf2m",
+ "gfpm",
+]
+
+[[package]]
+name = "gf-poly"
+version = "0.1.0"
+dependencies = [
  "gf2m",
  "gfpm",
 ]
