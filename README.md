@@ -15,6 +15,8 @@
 
 LDPC и RS используют собственные API и пока не подключены к `coding-core`.
 
+[`kerdock-codes`](kerdock-codes/README.md#shared-coding-core-block-interfaces) implements the shared `coding-core` block encoder/decoder interfaces; run `cargo run -p kerdock-codes --example shared_codec`.
+
 ## Двоичные LDPC-коды
 
 Крейт [`ldpc-codes`](ldpc-codes/README.md) предоставляет разреженную проверочную матрицу, систематический кодер, полный SPA-декодер и конфигуратор согласованной пары. [Руководство крейта](ldpc-codes/README.md) содержит быстрый старт и примеры API.
@@ -29,6 +31,23 @@ cargo run -p ldpc-codes --example systematic_encode
 cargo run -p ldpc-codes --example spa_step
 cargo run -p ldpc-codes --example decode_with_log
 cargo run -p ldpc-codes --example decode_round_trip
+```
+
+## Двоичные коды Кердока
+
+Крейт [`kerdock-codes`](kerdock-codes/README.md) предоставляет общий параметризованный кодер и декодер по расстоянию Хэмминга. Один вызов обрабатывает ровно один блок `bool` (`false = 0`, `true = 1`), не поток байтов. Код нелинейный и не систематический: `k` — ёмкость сообщения, а не размерность линейного пространства; для точного извлечения сообщения есть `extract_message`.
+
+| Показатель `m` | Слово `n = 2^m`, бит | Сообщение `k = 2m`, бит | Минимальное расстояние | Радиус исправления |
+| --- | --- | --- | --- | --- |
+| 4 | 16 | 8 | 6 | 2 |
+| 6 | 64 | 12 | 28 | 13 |
+| 8 | 256 | 16 | 120 | 59 |
+| 10 | 1024 | 20 | 496 | 247 |
+
+При числе инверсий не больше радиуса гарантировано восстановление исходного сообщения. За его пределами возможны и отказ, и успешный возврат другого сообщения: результат не определяет, что было передано. Порядок битов и координат закреплён в [руководстве](kerdock-codes/README.md); побитовая совместимость с Magma/GUAVA не заявляется. Требуются `std` и Rust 1.81+.
+
+```sh
+cargo run -p kerdock-codes --example round_trip
 ```
 
 ## Согласованные ограничения размеров
