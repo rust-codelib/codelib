@@ -41,6 +41,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --workspace --release
 
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo run --locked --release -p codelib-testkit -- --config configs/smoke.toml
+
   doc:
     runs-on: ubuntu-latest
     env:

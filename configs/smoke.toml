@@ -1,0 +1,10 @@
+seed = 42
+warmup = 5
+repetitions = 100
+log_level = "info"
+
+[ldpc]
+errors = 1
+max_iterations = 50
+llr_magnitude = 3.0
+llr_limit = 20.0

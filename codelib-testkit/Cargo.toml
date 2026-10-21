@@ -1,0 +1,20 @@
+[package]
+name = "codelib-testkit"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Smoke-проверки и замеры кодеков codelib"
+
+[dependencies]
+gf2m = { path = "../gf2m" }
+gfpm = { path = "../gfpm" }
+gf-linalg = { path = "../gf-linalg" }
+ldpc-codes = { path = "../ldpc-codes" }
+rs-codes = { path = "../rs-codes" }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+log = "0.4"
+env_logger = { version = "0.11", default-features = false }
+rand = { version = "0.9", default-features = false, features = ["std"] }
+rand_chacha = "0.9"
