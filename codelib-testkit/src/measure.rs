@@ -28,24 +28,72 @@ pub fn bits_per_second(payload_bits: usize, calls: usize, elapsed: Duration) -> 
         .then(|| payload_bits as f64 * calls as f64 / elapsed.as_secs_f64())
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
-pub struct Counts {
-    pub blocks: usize,
-    pub recovered: usize,
-    pub before: usize,
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct WordErrors {
     pub corrected: usize,
     pub introduced: usize,
     pub residual: usize,
 }
 
+/// One completed attempt; missing word metrics never mean zero errors.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Observation {
+    pub recovered: bool,
+    pub before: Option<usize>,
+    pub after: Option<WordErrors>,
+    pub iterations: Option<usize>,
+}
+
+impl Observation {
+    pub fn validate(self, n: usize) -> Result<Self, String> {
+        let invalid_before = self.before.is_some_and(|before| before > n);
+        let invalid_after = self.after.is_some_and(|after| {
+            after.corrected > n
+                || after.introduced > n
+                || after.residual > n
+                || self.recovered != (after.residual == 0)
+                || self.before.is_some_and(|before| {
+                    after.corrected > before
+                        || after.introduced > n.saturating_sub(before)
+                        || before - after.corrected + after.introduced != after.residual
+                })
+        });
+        if invalid_before || invalid_after {
+            return Err(format!("invalid block observation: {self:?}"));
+        }
+        Ok(self)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Counts {
+    pub blocks: usize,
+    pub recovered: usize,
+    pub before: Option<usize>,
+    pub after: Option<WordErrors>,
+}
+
+impl Default for Counts {
+    fn default() -> Self {
+        Self {
+            blocks: 0,
+            recovered: 0,
+            before: Some(0),
+            after: Some(WordErrors::default()),
+        }
+    }
+}
+
 impl Counts {
-    pub fn add(&mut self, other: Self) {
-        self.blocks += other.blocks;
-        self.recovered += other.recovered;
-        self.before += other.before;
-        self.corrected += other.corrected;
-        self.introduced += other.introduced;
-        self.residual += other.residual;
+    pub fn add(&mut self, observation: Observation) {
+        self.blocks += 1;
+        self.recovered += usize::from(observation.recovered);
+        self.before = self.before.zip(observation.before).map(|(a, b)| a + b);
+        self.after = self.after.zip(observation.after).map(|(a, b)| WordErrors {
+            corrected: a.corrected + b.corrected,
+            introduced: a.introduced + b.introduced,
+            residual: a.residual + b.residual,
+        });
     }
 }
 
@@ -54,24 +102,26 @@ pub fn count_errors<T: Eq>(
     reference: &[T],
     received: &[T],
     decoded: &[T],
-) -> Result<Counts, String> {
+) -> Result<Observation, String> {
     if reference.len() != received.len() || reference.len() != decoded.len() {
         return Err("word lengths differ".into());
     }
-    let mut counts = Counts {
-        blocks: 1,
-        ..Default::default()
-    };
-    for ((expected, before), after) in reference.iter().zip(received).zip(decoded) {
+    let mut errors_before = 0;
+    let mut after = WordErrors::default();
+    for ((expected, before), decoded) in reference.iter().zip(received).zip(decoded) {
         let was_wrong = before != expected;
-        let is_wrong = after != expected;
-        counts.before += usize::from(was_wrong);
-        counts.residual += usize::from(is_wrong);
-        counts.corrected += usize::from(was_wrong && !is_wrong);
-        counts.introduced += usize::from(!was_wrong && is_wrong);
+        let is_wrong = decoded != expected;
+        errors_before += usize::from(was_wrong);
+        after.residual += usize::from(is_wrong);
+        after.corrected += usize::from(was_wrong && !is_wrong);
+        after.introduced += usize::from(!was_wrong && is_wrong);
     }
-    counts.recovered = usize::from(counts.residual == 0);
-    Ok(counts)
+    Ok(Observation {
+        recovered: after.residual == 0,
+        before: Some(errors_before),
+        after: Some(after),
+        iterations: None,
+    })
 }
 
 #[cfg(test)]
@@ -86,13 +136,15 @@ mod tests {
         let counts = count_errors(&[0; 4], &[1, 1, 0, 0], &[1, 0, 1, 0]).unwrap();
         assert_eq!(
             counts,
-            Counts {
-                blocks: 1,
-                recovered: 0,
-                before: 2,
-                corrected: 1,
-                introduced: 1,
-                residual: 2
+            Observation {
+                recovered: false,
+                before: Some(2),
+                after: Some(WordErrors {
+                    corrected: 1,
+                    introduced: 1,
+                    residual: 2
+                }),
+                iterations: None,
             }
         );
         assert!(count_errors(&[0], &[], &[0]).is_err());
