@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod config;
+mod kerdock;
 mod ldpc;
 mod smoke;
 
@@ -176,16 +177,33 @@ fn main() -> ExitCode {
     }
     println!("rs-codec         skipped: encode/decode not implemented");
     log::warn!("RS encode/decode algorithms are not implemented");
-    let points = ldpc::run(&config).unwrap_or_else(|error| {
-        vec![PointReport::new(
+    let mut points = Vec::new();
+    for (name, channel, counts, run) in [
+        (
             "ldpc-codes",
             ChannelKind::BitFlips,
-            config.ldpc.error_counts.points()[0],
-            config.repetitions,
-            Err(error),
-        )]
-    });
-    failed |= !show_series(&points);
+            &config.ldpc.error_counts,
+            ldpc::run as fn(&Config) -> Result<Vec<PointReport>, String>,
+        ),
+        (
+            "kerdock-codes",
+            ChannelKind::BitFlips,
+            &config.kerdock.error_counts,
+            kerdock::run,
+        ),
+    ] {
+        let series = run(&config).unwrap_or_else(|error| {
+            vec![PointReport::new(
+                name,
+                channel,
+                counts.points()[0],
+                config.repetitions,
+                Err(error),
+            )]
+        });
+        failed |= !show_series(&series);
+        points.extend(series);
+    }
     if let Some(path) = csv {
         let result = std::fs::File::create(&path)
             .map_err(csv::Error::from)

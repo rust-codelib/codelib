@@ -8,3 +8,6 @@ errors = 1
 max_iterations = 50
 llr_magnitude = 3.0
 llr_limit = 20.0
+
+[kerdock]
+error_counts = 1

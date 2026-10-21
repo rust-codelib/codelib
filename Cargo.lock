@@ -130,6 +130,7 @@ dependencies = [
  "gf-linalg",
  "gf2m",
  "gfpm",
+ "kerdock-codes",
  "ldpc-codes",
  "log",
  "rand",

@@ -8,6 +8,7 @@ description = "Smoke-проверки и замеры кодеков codelib"
 
 [dependencies]
 coding-core = { path = "../coding-core" }
+kerdock-codes = { path = "../kerdock-codes" }
 gf2m = { path = "../gf2m" }
 gfpm = { path = "../gfpm" }
 gf-linalg = { path = "../gf-linalg" }

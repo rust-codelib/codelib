@@ -9,6 +9,7 @@ pub struct Config {
     pub repetitions: usize,
     pub log_level: String,
     pub ldpc: LdpcConfig,
+    pub kerdock: crate::kerdock::Settings,
 }
 
 impl Default for Config {
@@ -19,6 +20,7 @@ impl Default for Config {
             repetitions: 100,
             log_level: "info".into(),
             ldpc: LdpcConfig::default(),
+            kerdock: crate::kerdock::Settings::default(),
         }
     }
 }
@@ -92,6 +94,11 @@ impl Config {
             .parse::<log::LevelFilter>()
             .map_err(|e| e.to_string())?;
         config.ldpc.validate(crate::ldpc::N)?;
+        config.kerdock.error_counts.validate(crate::kerdock::N)?;
+        config
+            .repetitions
+            .checked_mul(config.kerdock.error_counts.points().len())
+            .ok_or("total trials overflow")?;
         config
             .repetitions
             .checked_mul(config.ldpc.error_counts.points().len())

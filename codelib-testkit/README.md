@@ -12,13 +12,13 @@ cargo run --locked --release -p codelib-testkit -- \
 По умолчанию используется `configs/smoke.toml`; `--help` выводит справку.
 Результаты идут в stdout, логи — в stderr; `RUST_LOG` переопределяет `log_level`.
 
-CLI запускает LDPC (128 бит, сообщение 64 бита).
+CLI запускает LDPC (128 бит, сообщение 64 бита) и Kerdock Bits64 (64/12 бит).
 LDPC использует проверки `[i, (i+1)%64, 64+i]`, где `0 <= i < 64`.
 Также проверяются поля, матрицы и конфигурация RS; encode/decode RS пропускается.
 
 Общие настройки: `seed`, `warmup`, `repetitions > 0`, `log_level`.
-В `[ldpc]` поле `error_counts` принимает число или непустой список
-различных чисел в пределах 0..=128; точки сортируются.
+В `[ldpc]` и `[kerdock]` поле `error_counts` принимает число или непустой список
+различных чисел в пределах 0..=128 и 0..=64 соответственно; точки сортируются.
 У LDPC `errors` — синоним `error_counts`; одновременно задавать их нельзя.
 Параметры LDPC: `max_iterations`, `llr_magnitude`, `llr_limit`. Модуль LLR
 конечный, положительный и не превышает `llr_limit`. Значения по умолчанию — в
@@ -54,7 +54,7 @@ CSV содержит строку на точку: размеры, канал, �
 CI сохраняет CSV как артефакт.
 
 Новая smoke-проверка — функция и вызов из `main`. Пример подключения кодека —
-[адаптер LDPC](src/ldpc.rs): `BlockLayout`, `CodecOps` и `BlockScenario::run`.
+[адаптер Kerdock](src/kerdock.rs): `BlockLayout`, `CodecOps` и `BlockScenario::run`.
 Длины задаются в элементах, `payload_bits` — информационные биты.
 `Channel` поддерживает инверсии и стирания; `prepare` получает `None` для стираний.
 `encoded` и `decoded` проверяют инварианты вне таймеров. `Trial::buffers` и
