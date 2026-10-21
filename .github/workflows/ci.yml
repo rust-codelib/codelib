@@ -47,6 +47,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo run --locked --release -p codelib-testkit -- --config configs/smoke.toml
+      - run: cargo run --locked --release -p codelib-testkit -- --config configs/experiment.toml --csv target/experiment.csv
+        if: ${{ !cancelled() }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: codelib-experiment
+          path: target/experiment.csv
 
   doc:
     runs-on: ubuntu-latest
@@ -75,6 +82,7 @@ jobs:
       - run: cargo check --workspace --lib
       - run: cargo test -p coding-core
       - run: cargo build -p coding-core --example buffers
+      - run: cargo check --locked -p codelib-testkit --all-targets
 
   contracts:
     # Заморозка контрактов: приёмочные тесты РС обязаны собираться
