@@ -120,23 +120,6 @@ fn main() -> Result<(), LdpcError> {
 }
 ```
 
-## Переход с прежнего API
-
-Прежние трейты удалены; это несовместимое изменение. Исторические имена ниже нужны
-только для перехода.
-
-| Было | Стало |
-|---|---|
-| `ldpc_codes::Encoder` | `coding_core::Encoder<&[Bit]>` с `Output = Codeword<Vec<Bit>>` |
-| `ldpc_codes::Decoder` | `coding_core::Decoder<DecodeInput<'_>>` |
-| `ldpc_codes::DecodeObserver` | `coding_core::Observer<DecodeEvent>` |
-| `decoder.decode(input, None)` | `decoder.decode(input, &mut NoopObserver)` |
-| `decoder.decode(input, Some(&mut observer))` | `decoder.decode(input, &mut observer)` |
-| `encoder.encode(&message)?` | `encoder.encode(&message, &mut NoopObserver)?.0` |
-| `configured.encoder().encode(&message)?` | `configured.encode(&message, &mut NoopObserver)?.0` |
-| `configured.decode(input, observer)?` | `coding_core::Decoder::decode`; из `LdpcDecodeOutcome` извлекается `Candidate` |
-| результат декодирования напрямую | `Candidate { checks: DecodeChecks, value: DecodeResult }` |
-
 ## Ограничения
 
 - Каждая ось [`ParityCheckMatrix`] имеет размер `1..=4096`. Пустые и повторяющиеся строки разрешены; повтор индекса внутри строки запрещён. Матрица хранит `O(m + n + E)` связей.
