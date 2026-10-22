@@ -223,13 +223,13 @@ pub fn spa_step(
 }
 
 #[cfg(test)]
-#[path = "spa/tests.rs"]
+#[path = "../tests/unit/spa/mod.rs"]
 mod tests;
 
 #[cfg(test)]
-#[path = "spa/reference_tests.rs"]
+#[path = "../tests/unit/spa/reference_tests.rs"]
 mod reference_tests;
 
 #[cfg(test)]
-#[path = "spa/decoder_tests.rs"]
+#[path = "../tests/unit/spa/decoder_tests.rs"]
 mod decoder_tests;

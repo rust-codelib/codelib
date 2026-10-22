@@ -3,6 +3,12 @@ use coding_core::{DecodeOutcome, Decoder as _, NoopObserver};
 use super::*;
 use crate::{Bit, DecodeInput, DecodeStatus, DecoderConfig, LdpcError, ParityCheckMatrix};
 use proptest::prelude::*;
+use proptest::test_runner::FileFailurePersistence;
+
+const REGRESSION_FILE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/proptest-regressions/spa/reference_tests.txt"
+);
 
 const GENERATED_SPA_ABSOLUTE_TOLERANCE: f64 = 2e-9;
 const GENERATED_SPA_RELATIVE_TOLERANCE: f64 = 2e-10;
@@ -276,6 +282,11 @@ fn direct_neighbor_reference_matches_two_steps_on_a_mixed_small_graph() {
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig {
+        failure_persistence: Some(Box::new(FileFailurePersistence::Direct(REGRESSION_FILE))),
+        ..ProptestConfig::default()
+    })]
+
     #[test]
     fn generated_one_or_two_spa_steps_match_the_direct_reference(
         (dense_h, llrs, steps) in generated_reference_case()
