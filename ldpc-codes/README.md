@@ -10,15 +10,17 @@ Rust 1.81+ · `std` · `unsafe` запрещён.
 
 ```toml
 [dependencies]
+coding-core = { path = "../codelib/coding-core" }
 ldpc-codes = { path = "../codelib/ldpc-codes" }
 ```
 
 Этот пример строит согласованные кодер и декодер, кодирует один бит, декодирует LLR, проверяет статус и только затем извлекает сообщение:
 
 ```rust
+use coding_core::{Decoder, Encoder, NoopObserver};
 use ldpc_codes::{
-    Bit, DecodeInput, DecodeStatus, DecoderConfig, Encoder, LdpcConfigurator,
-    LdpcError, ParityCheckMatrix,
+    Bit, DecodeInput, DecodeStatus, DecoderConfig, LdpcConfigurator, LdpcError,
+    ParityCheckMatrix,
 };
 
 fn main() -> Result<(), LdpcError> {
@@ -26,12 +28,17 @@ fn main() -> Result<(), LdpcError> {
     let mut code = LdpcConfigurator::build(checks, DecoderConfig::try_new(1, 20.0)?)?;
 
     let message = [Bit::One];
-    let encoded = code.encoder().encode(&message)?;
+    let encoded = code.encode(&message, &mut NoopObserver)?.0;
     let llrs = [-2.0, 1.0, -3.0];
-    let result = code.decode(
+    let candidate = match code.decode(
         DecodeInput { llrs: &llrs, erasures: &[] },
-        None,
-    )?;
+        &mut NoopObserver,
+    )? {
+        coding_core::DecodeOutcome::Candidate(candidate) => candidate,
+        coding_core::DecodeOutcome::NeedMore(reason) => match reason {},
+        coding_core::DecodeOutcome::Stopped(reason) => match reason {},
+    };
+    let result = candidate.value;
 
     assert_eq!(result.status(), DecodeStatus::ParitySatisfied);
     let recovered = code.encoder().extract_message(result.word())?;
@@ -41,7 +48,15 @@ fn main() -> Result<(), LdpcError> {
 }
 ```
 
-Методы `encode` и `extract_message` заданы трейтом [`Encoder`]. Пара `ConfiguredLdpc` предоставляет собственный `decode`, чтобы её внутренний декодер оставался согласован с кодером. `?` возвращает вызывающему коду ошибку из `Result`, если операция не удалась.
+Кодирование и декодирование заданы общими трейтами `coding_core::Encoder<&[Bit]>` и
+`coding_core::Decoder<DecodeInput>`. `ConfiguredLdpc` реализует оба трейта через свои
+закрытые компоненты, поэтому кодер и декодер остаются согласованными. `encode`
+возвращает `Codeword<Vec<Bit>>`; `.0` извлекает вектор слова. `decode` возвращает
+`LdpcDecodeOutcome`, поскольку общий контракт допускает `NeedMore` и `Stopped`; у SPA
+эти типы равны `Infallible`, поэтому соответствующие ветки пусты. В `Candidate`
+лежат `value: DecodeResult` и снимок проверок `checks`. Ненулевой синдром в кандидате
+нормален: это не доказательство совпадения с переданным словом. `?` возвращает
+вызывающему коду ошибку из `Result`, если операция не удалась.
 
 ## Операции
 
@@ -49,10 +64,10 @@ fn main() -> Result<(), LdpcError> {
 |---|---|
 | Создать бит и преобразовать биты в [`gf_linalg::Vector`] над [`Gf2`] | [`Bit`], [`bits_to_vector`], [`vector_to_bits`] |
 | Создать `H`, получить смежности и вычислить синдром | `ParityCheckMatrix::try_from_rows`, `ParityCheckMatrix::check_bits`, `ParityCheckMatrix::bit_checks`, `ParityCheckMatrix::syndrome`, `ParityCheckMatrix::is_codeword` |
-| Кодировать и извлекать сообщение | `Encoder::encode`, `Encoder::extract_message`, `SystematicEncoder::information_positions` |
-| Создать согласованные кодер и декодер | `LdpcConfigurator::build`, `ConfiguredLdpc::encoder`, `ConfiguredLdpc::decode` |
-| Декодировать блок или выполнить один flooding-шаг | `Decoder::decode`, `spa_step` |
-| Получить статус, счётчики и события | [`DecodeResult`], [`DecodeStatus`], [`DecodeObserver`], [`DecodeEvent`] |
+| Кодировать и извлекать сообщение | `coding_core::Encoder::encode`, `SystematicEncoder::extract_message`, `SystematicEncoder::information_positions` |
+| Создать согласованные кодер и декодер | `LdpcConfigurator::build`, `ConfiguredLdpc::encoder`, общие трейты `coding_core::{Encoder, Decoder}` |
+| Декодировать блок или выполнить один flooding-шаг | `coding_core::Decoder::decode`, `spa_step` |
+| Получить статус, счётчики и события | [`DecodeResult`], [`DecodeStatus`], `coding_core::Observer<DecodeEvent>`, [`DecodeEvent`] |
 | Сравнить результат с известным эталоном | [`count_bit_errors`] |
 
 В `ParityCheckMatrix::try_from_rows(n, rows)` параметр `n` задаёт число столбцов, а каждый список в `rows` перечисляет индексы единиц одной проверки. Здесь `m` — число строк, а `E` — общее число единиц матрицы.
@@ -71,20 +86,22 @@ fn main() -> Result<(), LdpcError> {
 
 ## Векторы и диагностика
 
-[`bits_to_vector`] и [`vector_to_bits`] преобразуют биты в [`gf_linalg::Vector<Gf2>`] и обратно, сохраняя порядок, длину и хвостовые нули. `Gf2` — псевдоним `gfpm::Gf<2, 1, 1>`. Сообщение кодера — блок из `k = n - rank(H)` битов; `message[j]` помещается в `word[information_positions()[j]]`, и информационные позиции не обязательно идут первыми. Предел 4096 байт из требований относится к будущему байтовому слою: здесь API не упаковывает биты и не разбивает длинное сообщение на блоки.
+[`bits_to_vector`] и [`vector_to_bits`] преобразуют биты в [`gf_linalg::Vector<Gf2>`] и обратно, сохраняя порядок, длину и хвостовые нули. `Gf2` — псевдоним `gfpm::Gf<2, 1, 1>`. Сообщение кодера — блок из `k = n - rank(H)` битов; `message[j]` помещается в `word[information_positions()[j]]`, и информационные позиции не обязательно идут первыми.
 
-[`DecodeResult`] предоставляет `word()`, `posterior_llrs()`, `syndrome()`, `status()`, `iterations()`, `initial_unsatisfied_checks()` и `final_unsatisfied_checks()`. `changed_bits()` считает отличия от начального жёсткого решения; это не число исправленных ошибок. Для собственного `impl Decoder` результат создаётся через `DecodeResult::try_new(&checks, initial_word, posterior_llrs, status, iterations, iteration_limit)`: итоговое слово выводится из знаков LLR, а синдром и счётчики вычисляются по `H`. Конструктор проверяет формы, конечность LLR, статус и бюджет итераций, но не может подтвердить историю внешнего алгоритма — например, соответствие `initial_word` канальным значениям или факт выполнения каждой заявленной итерации. [`count_bit_errors`] требует равные длины: кодовое слово длины `n` сравнивают с эталонным словом, а сообщение длины `k` — с эталонным сообщением. Декодер обычно эталона не знает.
+Логический размер текущего битового сообщения задаётся `MessageBytes::from_bits(k)` и равен `ceil(k / 8)` байтам; это не объём памяти `Bit` или `Vec`. Поскольку `k <= n <= 4096` бит, передаваемое сообщение занимает не более 512 байт. Байтовый API, упаковка битов и работа с исходным сообщением до 4096 байт пока не реализованы: кодек принимает один блок битов и не разбивает длинное сообщение на блоки.
 
-События [`DecodeEvent`] приходят синхронно через [`DecodeObserver`]: начало, завершённая итерация и остановка. Передайте `Some(&mut observer)` в `decode`; `None` отключает события. При ошибке входа события не отправляются.
+[`DecodeResult`] предоставляет `word()`, `posterior_llrs()`, `syndrome()`, `status()`, `iterations()`, `initial_unsatisfied_checks()` и `final_unsatisfied_checks()`. `changed_bits()` считает отличия от начального жёсткого решения; это не число исправленных ошибок. Для собственного `impl coding_core::Decoder<DecodeInput<'_>>` результат создаётся через `DecodeResult::try_new(&checks, initial_word, posterior_llrs, status, iterations, iteration_limit)` и возвращается как `DecodeOutcome::Candidate(Candidate { checks: result.checks(), value: result })`: итоговое слово выводится из знаков LLR, а синдром и счётчики вычисляются по `H`. Конструктор проверяет формы, конечность LLR, статус и бюджет итераций, но не может подтвердить историю внешнего алгоритма — например, соответствие `initial_word` канальным значениям или факт выполнения каждой заявленной итерации. [`count_bit_errors`] требует равные длины: кодовое слово длины `n` сравнивают с эталонным словом, а сообщение длины `k` — с эталонным сообщением. Декодер обычно эталона не знает.
+
+События [`DecodeEvent`] приходят синхронно через `coding_core::Observer<DecodeEvent>`: начало, завершённая итерация и остановка. Передайте `&mut observer` в `decode`; `coding_core::NoopObserver` отключает события. При ошибке входа события не отправляются, а паника наблюдателя прерывает вызов.
 
 ```rust
+use coding_core::{Decoder, Observer};
 use ldpc_codes::{
-    DecodeEvent, DecodeInput, DecodeObserver, Decoder, DecoderConfig, LdpcError,
-    ParityCheckMatrix, SpaDecoder,
+    DecodeEvent, DecodeInput, DecoderConfig, LdpcError, ParityCheckMatrix, SpaDecoder,
 };
 
 struct Log;
-impl DecodeObserver for Log {
+impl Observer<DecodeEvent> for Log {
     fn on_event(&mut self, event: &DecodeEvent) {
         println!("{event:?}");
     }
@@ -95,9 +112,9 @@ fn main() -> Result<(), LdpcError> {
     let mut decoder = SpaDecoder::try_new(checks, DecoderConfig::default())?;
     let llrs = [2.0, -3.0, 4.0];
     let mut log = Log;
-    let _result = decoder.decode(
+    let _outcome = decoder.decode(
         DecodeInput { llrs: &llrs, erasures: &[] },
-        Some(&mut log),
+        &mut log,
     )?;
     Ok(())
 }
@@ -108,7 +125,7 @@ fn main() -> Result<(), LdpcError> {
 - Каждая ось [`ParityCheckMatrix`] имеет размер `1..=4096`. Пустые и повторяющиеся строки разрешены; повтор индекса внутри строки запрещён. Матрица хранит `O(m + n + E)` связей.
 - Систематическому кодеру и конфигуратору нужен ранг `0 < rank(H) < n`. Зависимые строки учитываются через ранг; информационные позиции могут быть не первыми битами слова.
 - [`SpaDecoder`] работает с любой допустимой матрицей, но SPA может не сойтись или вернуть другое допустимое кодовое слово.
-- Общий тип полинома и его ещё не выбранный API, байтовая упаковка и предел исходного сообщения в байтах относятся к будущей интеграции. Сейчас кодек принимает только один блок битов.
+- Общий тип полинома и его ещё не выбранный API, байтовая упаковка и работа целым исходным сообщением до 4096 байт относятся к будущей интеграции. Сейчас кодек принимает только один блок битов.
 
 ## Примеры и проверки
 

@@ -1,6 +1,15 @@
+use coding_core::{DecodeOutcome, Decoder as _, NoopObserver};
+
 use super::*;
+use crate::test_support::prepared_channel;
 use crate::{Bit, DecodeInput, DecodeStatus, DecoderConfig, LdpcError, ParityCheckMatrix};
 use proptest::prelude::*;
+use proptest::test_runner::FileFailurePersistence;
+
+const REGRESSION_FILE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/proptest-regressions/spa/reference_tests.txt"
+);
 
 const GENERATED_SPA_ABSOLUTE_TOLERANCE: f64 = 2e-9;
 const GENERATED_SPA_RELATIVE_TOLERANCE: f64 = 2e-10;
@@ -274,6 +283,11 @@ fn direct_neighbor_reference_matches_two_steps_on_a_mixed_small_graph() {
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig {
+        failure_persistence: Some(Box::new(FileFailurePersistence::Direct(REGRESSION_FILE))),
+        ..ProptestConfig::default()
+    })]
+
     #[test]
     fn generated_one_or_two_spa_steps_match_the_direct_reference(
         (dense_h, llrs, steps) in generated_reference_case()
@@ -376,9 +390,14 @@ fn independent_dense_syndrome_cycle_runs_both_general_plan_examples() {
 
         let mut decoder = SpaDecoder::try_new(sparse_checks_from_dense(&dense_h), config)
             .expect("the general-plan matrix is valid for SPA");
-        let result = decoder
-            .decode(input, None)
+        let outcome = decoder
+            .decode(input, &mut NoopObserver)
             .expect("the general-plan LLR block is valid");
+        let result = match outcome {
+            DecodeOutcome::Candidate(candidate) => candidate.value,
+            DecodeOutcome::NeedMore(reason) => match reason {},
+            DecodeOutcome::Stopped(reason) => match reason {},
+        };
         assert_eq!(result.word(), reference_result.word);
         assert_float_slices_close(
             &reference_result.posterior,

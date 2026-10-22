@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
-use ldpc_codes::{Bit, Encoder, LdpcError, ParityCheckMatrix, SystematicEncoder};
+use coding_core::{Encoder, NoopObserver};
+use ldpc_codes::{Bit, LdpcError, ParityCheckMatrix, SystematicEncoder};
 
 const MAIN_H: [[u8; 6]; 4] = [
     [1, 1, 0, 1, 0, 0],
@@ -66,14 +67,17 @@ fn dense_syndrome<const N: usize>(checks: &[[u8; N]], word: &[Bit]) -> Vec<u8> {
 }
 
 fn assert_full_code_space<const ROWS: usize, const N: usize>(
-    encoder: &SystematicEncoder,
+    encoder: &mut SystematicEncoder,
     checks: &[[u8; N]; ROWS],
 ) {
     let mut encoded_words = BTreeSet::new();
     for message_mask in 0..(1usize << encoder.message_len()) {
         let message = bits_from_mask(encoder.message_len(), message_mask);
         let before = message.clone();
-        let word = encoder.encode(&message).unwrap();
+        let word = encoder
+            .encode(message.as_slice(), &mut NoopObserver)
+            .unwrap()
+            .0;
 
         assert_eq!(word.len(), N);
         assert_eq!(message, before);
@@ -94,7 +98,13 @@ fn assert_full_code_space<const ROWS: usize, const N: usize>(
         if unsatisfied_checks == 0 {
             independent_kernel.insert(word_mask);
             let message = encoder.extract_message(&word).unwrap();
-            assert_eq!(encoder.encode(&message).unwrap(), word);
+            assert_eq!(
+                encoder
+                    .encode(message.as_slice(), &mut NoopObserver)
+                    .unwrap()
+                    .0,
+                word
+            );
         } else {
             assert_eq!(
                 encoder.extract_message(&word),
@@ -109,7 +119,7 @@ fn assert_full_code_space<const ROWS: usize, const N: usize>(
 }
 
 fn assert_generator_matrix<const ROWS: usize, const N: usize>(
-    encoder: &SystematicEncoder,
+    encoder: &mut SystematicEncoder,
     checks: &[[u8; N]; ROWS],
 ) {
     let k = encoder.message_len();
@@ -118,8 +128,9 @@ fn assert_generator_matrix<const ROWS: usize, const N: usize>(
             let mut basis = vec![Bit::Zero; k];
             basis[message_index] = Bit::One;
             encoder
-                .encode(&basis)
+                .encode(&basis, &mut NoopObserver)
                 .unwrap()
+                .0
                 .iter()
                 .copied()
                 .map(bit_value)
@@ -157,27 +168,27 @@ fn assert_generator_matrix<const ROWS: usize, const N: usize>(
 
 #[test]
 fn exhaustive_main_example_matches_the_independent_dense_kernel_and_generator() {
-    let encoder = SystematicEncoder::try_new(checks_from_dense(&MAIN_H)).unwrap();
+    let mut encoder = SystematicEncoder::try_new(checks_from_dense(&MAIN_H)).unwrap();
 
     assert_eq!(encoder.rank(), 3);
     assert_eq!(encoder.message_len(), 3);
-    assert_full_code_space(&encoder, &MAIN_H);
-    assert_generator_matrix(&encoder, &MAIN_H);
+    assert_full_code_space(&mut encoder, &MAIN_H);
+    assert_generator_matrix(&mut encoder, &MAIN_H);
 }
 
 #[test]
 fn exhaustive_cycle_example_matches_the_independent_dense_kernel_and_generator() {
-    let encoder = SystematicEncoder::try_new(checks_from_dense(&CYCLE_H)).unwrap();
+    let mut encoder = SystematicEncoder::try_new(checks_from_dense(&CYCLE_H)).unwrap();
 
     assert_eq!(encoder.rank(), 2);
     assert_eq!(encoder.message_len(), 3);
-    assert_full_code_space(&encoder, &CYCLE_H);
-    assert_generator_matrix(&encoder, &CYCLE_H);
+    assert_full_code_space(&mut encoder, &CYCLE_H);
+    assert_generator_matrix(&mut encoder, &CYCLE_H);
 }
 
 #[test]
 fn cycle_example_is_linear_for_every_pair_of_messages() {
-    let encoder = SystematicEncoder::try_new(checks_from_dense(&CYCLE_H)).unwrap();
+    let mut encoder = SystematicEncoder::try_new(checks_from_dense(&CYCLE_H)).unwrap();
     let message_count = 1usize << encoder.message_len();
 
     for left_mask in 0..message_count {
@@ -189,15 +200,18 @@ fn cycle_example_is_linear_for_every_pair_of_messages() {
                 .zip(&right)
                 .map(|(&a, &b)| bit(bit_value(a) ^ bit_value(b)))
                 .collect();
-            let left_word = encoder.encode(&left).unwrap();
-            let right_word = encoder.encode(&right).unwrap();
+            let left_word = encoder.encode(&left, &mut NoopObserver).unwrap().0;
+            let right_word = encoder.encode(&right, &mut NoopObserver).unwrap().0;
             let expected_xor: Vec<_> = left_word
                 .iter()
                 .zip(&right_word)
                 .map(|(&a, &b)| bit(bit_value(a) ^ bit_value(b)))
                 .collect();
 
-            assert_eq!(encoder.encode(&xor_message).unwrap(), expected_xor);
+            assert_eq!(
+                encoder.encode(&xor_message, &mut NoopObserver).unwrap().0,
+                expected_xor
+            );
         }
     }
 }
@@ -212,8 +226,8 @@ fn empty_repeated_and_dependent_checks_preserve_rank_and_the_full_code_space() {
         [1, 0, 1], // XOR of the first two rows
         [0, 0, 0], // empty row
     ];
-    let base = SystematicEncoder::try_new(checks_from_dense(&BASE_H)).unwrap();
-    let redundant = SystematicEncoder::try_new(checks_from_dense(&REDUNDANT_H)).unwrap();
+    let mut base = SystematicEncoder::try_new(checks_from_dense(&BASE_H)).unwrap();
+    let mut redundant = SystematicEncoder::try_new(checks_from_dense(&REDUNDANT_H)).unwrap();
 
     assert_eq!(redundant.rank(), base.rank());
     assert_eq!(redundant.message_len(), base.message_len());
@@ -222,12 +236,15 @@ fn empty_repeated_and_dependent_checks_preserve_rank_and_the_full_code_space() {
         base.information_positions()
     );
     assert_eq!(redundant.parity_positions(), base.parity_positions());
-    assert_full_code_space(&base, &BASE_H);
-    assert_full_code_space(&redundant, &REDUNDANT_H);
+    assert_full_code_space(&mut base, &BASE_H);
+    assert_full_code_space(&mut redundant, &REDUNDANT_H);
 
     for message_mask in 0..(1usize << base.message_len()) {
         let message = bits_from_mask(base.message_len(), message_mask);
-        assert_eq!(base.encode(&message), redundant.encode(&message));
+        assert_eq!(
+            base.encode(&message, &mut NoopObserver),
+            redundant.encode(&message, &mut NoopObserver)
+        );
     }
 }
 
@@ -244,7 +261,7 @@ fn sparse_syndrome(rows: &[Vec<usize>], word: &[Bit]) -> Vec<u8> {
 fn stretched_one_by_4096_matrix_keeps_isolated_columns_and_message_tail_zeros() {
     let rows = vec![vec![0]];
     let checks = ParityCheckMatrix::try_from_rows(4096, rows.clone()).unwrap();
-    let encoder = SystematicEncoder::try_new(checks).unwrap();
+    let mut encoder = SystematicEncoder::try_new(checks).unwrap();
 
     assert_eq!(encoder.rank(), 1);
     assert_eq!(encoder.message_len(), 4095);
@@ -258,7 +275,10 @@ fn stretched_one_by_4096_matrix_keeps_isolated_columns_and_message_tail_zeros() 
     let mut message = vec![Bit::Zero; 4095];
     message[0] = Bit::One;
     let original_message = message.clone();
-    let word = encoder.encode(&message).unwrap();
+    let word = encoder
+        .encode(message.as_slice(), &mut NoopObserver)
+        .unwrap()
+        .0;
     let original_word = word.clone();
 
     assert_eq!(word.len(), 4096);
@@ -267,7 +287,10 @@ fn stretched_one_by_4096_matrix_keeps_isolated_columns_and_message_tail_zeros() 
     assert!(word[2..].iter().all(|&value| value == Bit::Zero));
     assert_eq!(sparse_syndrome(&rows, &word), vec![0]);
     assert_eq!(encoder.extract_message(&word).unwrap(), message);
-    assert_eq!(encoder.encode(&message).unwrap(), original_word);
+    assert_eq!(
+        encoder.encode(&message, &mut NoopObserver).unwrap().0,
+        original_word
+    );
     assert_eq!(message, original_message);
     assert_eq!(word, original_word);
 }
@@ -277,7 +300,7 @@ fn stretched_4096_by_2_matrix_supports_many_dependent_checks() {
     let mut rows = vec![vec![0], vec![0]];
     rows.resize(4096, Vec::new());
     let checks = ParityCheckMatrix::try_from_rows(2, rows.clone()).unwrap();
-    let encoder = SystematicEncoder::try_new(checks).unwrap();
+    let mut encoder = SystematicEncoder::try_new(checks).unwrap();
 
     assert_eq!(encoder.rank(), 1);
     assert_eq!(encoder.message_len(), 1);
@@ -286,7 +309,10 @@ fn stretched_4096_by_2_matrix_supports_many_dependent_checks() {
     assert_eq!(encoder.parity_positions(), &[0]);
 
     let message = vec![Bit::One];
-    let word = encoder.encode(&message).unwrap();
+    let word = encoder
+        .encode(message.as_slice(), &mut NoopObserver)
+        .unwrap()
+        .0;
     let original_word = word.clone();
     assert_eq!(word, vec![Bit::Zero, Bit::One]);
     assert_eq!(sparse_syndrome(&rows, &word), vec![0; 4096]);
@@ -313,7 +339,10 @@ fn stretched_4096_by_2_matrix_supports_many_dependent_checks() {
             unsatisfied_checks: 2
         })
     );
-    assert_eq!(encoder.encode(&message).unwrap(), original_word);
+    assert_eq!(
+        encoder.encode(&message, &mut NoopObserver).unwrap().0,
+        original_word
+    );
     assert_eq!(message, vec![Bit::One]);
     assert_eq!(word, original_word);
     assert_eq!(invalid_word, original_invalid_word);
@@ -322,11 +351,11 @@ fn stretched_4096_by_2_matrix_supports_many_dependent_checks() {
 #[test]
 fn repeated_successful_and_invalid_calls_preserve_inputs_and_prior_results() {
     let checks = ParityCheckMatrix::try_from_rows(3, vec![vec![1, 2]]).unwrap();
-    let encoder = SystematicEncoder::try_new(checks).unwrap();
+    let mut encoder = SystematicEncoder::try_new(checks).unwrap();
 
     let message = vec![Bit::One, Bit::Zero];
     let original_message = message.clone();
-    let result = encoder.encode(&message).unwrap();
+    let result = encoder.encode(&message, &mut NoopObserver).unwrap().0;
     let original_result = result.clone();
     let invalid_message = vec![Bit::One];
     let original_invalid_message = invalid_message.clone();
@@ -334,14 +363,14 @@ fn repeated_successful_and_invalid_calls_preserve_inputs_and_prior_results() {
     let original_invalid_word = invalid_word.clone();
 
     assert_eq!(
-        encoder.encode(&invalid_message),
+        encoder.encode(&invalid_message, &mut NoopObserver),
         Err(LdpcError::MessageLengthMismatch {
             expected: 2,
             actual: 1,
         })
     );
     assert_eq!(
-        encoder.encode(&invalid_message),
+        encoder.encode(&invalid_message, &mut NoopObserver),
         Err(LdpcError::MessageLengthMismatch {
             expected: 2,
             actual: 1,
@@ -353,7 +382,10 @@ fn repeated_successful_and_invalid_calls_preserve_inputs_and_prior_results() {
             unsatisfied_checks: 1,
         })
     );
-    assert_eq!(encoder.encode(&message).unwrap(), original_result);
+    assert_eq!(
+        encoder.encode(&message, &mut NoopObserver).unwrap().0,
+        original_result
+    );
     assert_eq!(
         encoder.extract_message(&invalid_word),
         Err(LdpcError::InvalidCodeword {

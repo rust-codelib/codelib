@@ -1,3 +1,4 @@
+use super::support::float_bits;
 use super::*;
 
 mod step_tests {
@@ -170,7 +171,8 @@ mod state_tests {
         )
         .expect("matrix is valid");
 
-        let graph = graph::SparseGraph::try_new(&checks).expect("graph sizes are representable");
+        let sizes = graph::checked_workspace_sizes(&checks).expect("graph sizes are representable");
+        let graph = graph::SparseGraph::from_checked_sizes(&checks, sizes);
 
         assert_eq!(graph.edge_bits, [1, 4, 1, 3, 1, 4]);
         assert_eq!(

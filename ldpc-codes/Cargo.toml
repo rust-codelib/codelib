@@ -8,6 +8,7 @@ repository.workspace = true
 description = "Библиотека для двоичных LDPC-кодов"
 
 [dependencies]
+coding-core = { path = "../coding-core", version = "0.1.0" }
 gf-linalg = { path = "../gf-linalg", version = "0.1.0" }
 gfpm = { path = "../gfpm", version = "1.0.0" }
 

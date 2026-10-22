@@ -1,11 +1,11 @@
+use coding_core::{Decoder, Observer};
 use ldpc_codes::{
-    DecodeEvent, DecodeInput, DecodeObserver, Decoder, DecoderConfig, LdpcError, ParityCheckMatrix,
-    SpaDecoder,
+    DecodeEvent, DecodeInput, DecoderConfig, LdpcError, ParityCheckMatrix, SpaDecoder,
 };
 
 struct StdoutObserver;
 
-impl DecodeObserver for StdoutObserver {
+impl Observer<DecodeEvent> for StdoutObserver {
     fn on_event(&mut self, event: &DecodeEvent) {
         match event {
             DecodeEvent::Started { unsatisfied_checks } => {
@@ -41,13 +41,18 @@ fn main() -> Result<(), LdpcError> {
     let llrs = [2.0, -3.0, 4.0];
     let mut observer = StdoutObserver;
 
-    let result = decoder.decode(
+    let candidate = match decoder.decode(
         DecodeInput {
             llrs: &llrs,
             erasures: &[],
         },
-        Some(&mut observer),
-    )?;
+        &mut observer,
+    )? {
+        coding_core::DecodeOutcome::Candidate(candidate) => candidate,
+        coding_core::DecodeOutcome::NeedMore(reason) => match reason {},
+        coding_core::DecodeOutcome::Stopped(reason) => match reason {},
+    };
+    let result = candidate.value;
 
     println!("Итоговый статус: {:?}", result.status());
     println!("Итоговый синдром: {:?}", result.syndrome());

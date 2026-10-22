@@ -1,9 +1,16 @@
 use ldpc_codes::{spa_step, Bit, DecodeInput, DecoderConfig, LdpcError, ParityCheckMatrix};
 
+#[path = "common/general_plan.rs"]
+mod general_plan;
+#[path = "common/repetition.rs"]
+mod repetition;
+
+use general_plan::general_plan_checks;
+use repetition::repetition_checks;
+
 #[test]
 fn zero_iteration_budget_still_runs_one_complete_step_and_keeps_inputs() {
-    let checks =
-        ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1], vec![1, 2]]).expect("matrix is valid");
+    let checks = repetition_checks();
     let llrs = [2.0, -1.0, 3.0];
     let erasures: [usize; 0] = [];
     let config = DecoderConfig::try_new(0, 20.0).expect("limit is valid");
@@ -108,11 +115,7 @@ fn invalid_input_is_returned_as_an_error() {
 
 #[test]
 fn general_plan_llr_examples_match_the_one_step_results() {
-    let checks = ParityCheckMatrix::try_from_rows(
-        6,
-        vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5], vec![2, 3, 5]],
-    )
-    .expect("the general-plan parity-check matrix is valid");
+    let checks = general_plan_checks();
     let llr_1 = [-1.3863, 1.3863, -1.3863, 1.3863, -1.3863, -1.3863];
 
     let first = spa_step(

@@ -9,12 +9,6 @@ pub(super) struct SparseGraph {
 }
 
 impl SparseGraph {
-    #[cfg(test)]
-    pub(super) fn try_new(checks: &ParityCheckMatrix) -> Result<Self, LdpcError> {
-        let sizes = checked_workspace_sizes(checks)?;
-        Ok(Self::from_checked_sizes(checks, sizes))
-    }
-
     pub(super) fn from_checked_sizes(checks: &ParityCheckMatrix, sizes: WorkspaceSizes) -> Self {
         let mut check_edges = Vec::with_capacity(sizes.checks);
         let mut bit_edges = Vec::with_capacity(sizes.bits);
