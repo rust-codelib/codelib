@@ -1,7 +1,7 @@
 use super::graph::{checked_workspace_sizes, SparseGraph};
 use super::SpaStepResult;
 use crate::bit::bit_parity;
-use crate::decode_input::prepare_channel;
+use crate::decode::prepare_channel;
 use crate::{Bit, DecodeInput, DecoderConfig, LdpcError, ParityCheckMatrix};
 
 #[derive(Debug)]
