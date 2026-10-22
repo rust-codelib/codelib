@@ -163,45 +163,48 @@ fn hand_calculated_two_step_decode_obeys_budgets_and_reports_events() {
 
 #[test]
 fn initially_satisfied_word_stops_before_the_first_iteration() {
-    let mut decoder = SpaDecoder::try_new(repetition_checks(), DecoderConfig::default())
-        .expect("the matrix is valid");
-    let llrs = [2.0, 3.0, 4.0];
-    let mut events = Events::default();
+    for budget in [0, DecoderConfig::default().max_iterations()] {
+        let config = DecoderConfig::try_new(budget, 20.0).expect("the configuration is valid");
+        let mut decoder =
+            SpaDecoder::try_new(repetition_checks(), config).expect("the matrix is valid");
+        let llrs = [2.0, 3.0, 4.0];
+        let mut events = Events::default();
 
-    let result = decoded(
-        decoder
-            .decode(
-                DecodeInput {
-                    llrs: &llrs,
-                    erasures: &[],
+        let result = decoded(
+            decoder
+                .decode(
+                    DecodeInput {
+                        llrs: &llrs,
+                        erasures: &[],
+                    },
+                    &mut events,
+                )
+                .expect("the LLR block is valid"),
+        );
+
+        assert_eq!(result.posterior_llrs(), llrs);
+        assert_eq!(result.word(), [Bit::Zero; 3]);
+        assert_eq!(result.syndrome(), [Bit::Zero; 2]);
+        assert_eq!(result.status(), DecodeStatus::ParitySatisfied);
+        assert_eq!(result.iterations(), 0);
+        assert_eq!(result.changed_bits(), 0);
+        assert_eq!(result.initial_unsatisfied_checks(), 0);
+        assert_eq!(result.final_unsatisfied_checks(), 0);
+        assert_eq!(
+            events.0,
+            [
+                DecodeEvent::Started {
+                    unsatisfied_checks: 0
                 },
-                &mut events,
-            )
-            .expect("the LLR block is valid"),
-    );
-
-    assert_eq!(result.posterior_llrs(), llrs);
-    assert_eq!(result.word(), [Bit::Zero; 3]);
-    assert_eq!(result.syndrome(), [Bit::Zero; 2]);
-    assert_eq!(result.status(), DecodeStatus::ParitySatisfied);
-    assert_eq!(result.iterations(), 0);
-    assert_eq!(result.changed_bits(), 0);
-    assert_eq!(result.initial_unsatisfied_checks(), 0);
-    assert_eq!(result.final_unsatisfied_checks(), 0);
-    assert_eq!(
-        events.0,
-        [
-            DecodeEvent::Started {
-                unsatisfied_checks: 0
-            },
-            DecodeEvent::Finished {
-                iterations: 0,
-                status: DecodeStatus::ParitySatisfied,
-                unsatisfied_checks: 0,
-                changed_bits: 0,
-            }
-        ]
-    );
+                DecodeEvent::Finished {
+                    iterations: 0,
+                    status: DecodeStatus::ParitySatisfied,
+                    unsatisfied_checks: 0,
+                    changed_bits: 0,
+                }
+            ]
+        );
+    }
 }
 
 #[test]
@@ -258,8 +261,21 @@ fn input_errors_keep_their_priority_emit_nothing_and_do_not_poison_the_next_bloc
             },
         ),
         (
+            &[1.0, 2.0][..],
+            &[][..],
+            LdpcError::LlrLengthMismatch {
+                expected: 3,
+                actual: 2,
+            },
+        ),
+        (
             &[1.0, f64::INFINITY, f64::NAN][..],
             &[usize::MAX][..],
+            LdpcError::NonFiniteLlr { index: 1 },
+        ),
+        (
+            &[1.0, f64::NAN, 2.0][..],
+            &[][..],
             LdpcError::NonFiniteLlr { index: 1 },
         ),
         (
@@ -271,6 +287,11 @@ fn input_errors_keep_their_priority_emit_nothing_and_do_not_poison_the_next_bloc
             &[1.0, 2.0, 3.0][..],
             &[2, 1, 2, 1][..],
             LdpcError::DuplicateErasureIndex { bit: 2 },
+        ),
+        (
+            &[1.0, 2.0, 3.0][..],
+            &[1, 1][..],
+            LdpcError::DuplicateErasureIndex { bit: 1 },
         ),
     ];
 
