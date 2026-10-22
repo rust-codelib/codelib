@@ -352,6 +352,7 @@ dependencies = [
 name = "ldpc-codes"
 version = "0.1.0"
 dependencies = [
+ "coding-core",
  "gf-linalg",
  "gfpm",
  "proptest",

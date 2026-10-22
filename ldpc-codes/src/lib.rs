@@ -19,7 +19,10 @@ pub use bit::Bit;
 pub use configurator::{ConfiguredLdpc, LdpcConfigurator};
 pub use conversion::{bits_to_vector, vector_to_bits, Gf2};
 pub use decode_input::DecodeInput;
-pub use decoder::{DecodeEvent, DecodeObserver, DecodeResult, DecodeStatus, Decoder};
+pub use decoder::{
+    DecodeChecks, DecodeEvent, DecodeObserver, DecodeResult, DecodeStatus, Decoder,
+    LdpcDecodeOutcome,
+};
 pub use decoder_config::DecoderConfig;
 pub use diagnostics::count_bit_errors;
 pub use encoder::{Encoder, SystematicEncoder};

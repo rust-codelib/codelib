@@ -194,7 +194,59 @@ impl DecodeResult {
     pub fn final_unsatisfied_checks(&self) -> usize {
         self.final_unsatisfied_checks
     }
+
+    /// Возвращает сводку выполненной проверки чётности итогового слова.
+    ///
+    /// Сводка строится из уже вычисленного
+    /// [`final_unsatisfied_checks`](Self::final_unsatisfied_checks): синдром
+    /// не копируется и повторно не подсчитывается. Успешная проверка не
+    /// доказывает совпадение с оригиналом, поскольку декодер не знает
+    /// переданного слова.
+    #[must_use]
+    pub fn checks(&self) -> DecodeChecks {
+        DecodeChecks {
+            unsatisfied_checks: self.final_unsatisfied_checks,
+        }
+    }
 }
+
+/// Сводка выполненной проверки чётности итогового слова.
+///
+/// Хранит только число нарушенных строк `H`. Нулевое значение означает, что
+/// слово удовлетворяет проверочной матрице, но не доказывает совпадение с
+/// оригиналом: декодер не знает переданного слова, а другое допустимое кодовое
+/// слово также даст пройденную проверку.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DecodeChecks {
+    unsatisfied_checks: usize,
+}
+
+impl DecodeChecks {
+    /// Возвращает число нарушенных проверок итогового слова.
+    #[must_use]
+    pub fn unsatisfied_checks(&self) -> usize {
+        self.unsatisfied_checks
+    }
+
+    /// Возвращает `true`, если все проверки чётности итогового слова выполнены.
+    #[must_use]
+    pub fn parity_satisfied(&self) -> bool {
+        self.unsatisfied_checks == 0
+    }
+}
+
+/// Исход декодирования LDPC с богатым результатом и сводкой проверок.
+///
+/// Неиспользуемые варианты [`NeedMore`](coding_core::DecodeOutcome::NeedMore) и
+/// [`Stopped`](coding_core::DecodeOutcome::Stopped) типизированы
+/// [`Infallible`](core::convert::Infallible): текущий блочный декодер не может
+/// запросить дополнительные наблюдения или остановиться без кандидата.
+pub type LdpcDecodeOutcome = coding_core::DecodeOutcome<
+    DecodeResult,
+    DecodeChecks,
+    core::convert::Infallible,
+    core::convert::Infallible,
+>;
 
 /// Событие синхронного наблюдения за одним вызовом декодера.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
