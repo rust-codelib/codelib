@@ -1,18 +1,11 @@
 use coding_core::{Decoder, Encoder, NoopObserver};
 use ldpc_codes::{
-    Bit, DecodeChecks, DecodeInput, DecodeResult, DecodeStatus, DecoderConfig, LdpcConfigurator,
-    LdpcDecodeOutcome, LdpcError, ParityCheckMatrix,
+    Bit, DecodeInput, DecodeStatus, DecoderConfig, LdpcConfigurator, LdpcError, ParityCheckMatrix,
 };
 
-fn decoded(outcome: LdpcDecodeOutcome) -> DecodeResult {
-    let candidate: coding_core::Candidate<DecodeResult, DecodeChecks> = match outcome {
-        coding_core::DecodeOutcome::Candidate(candidate) => candidate,
-        coding_core::DecodeOutcome::NeedMore(reason) => match reason {},
-        coding_core::DecodeOutcome::Stopped(reason) => match reason {},
-    };
-    assert_eq!(candidate.checks, candidate.value.checks());
-    candidate.value
-}
+mod common;
+
+use common::decoded;
 
 fn checks_with_dependent_and_empty_rows() -> ParityCheckMatrix {
     ParityCheckMatrix::try_from_rows(5, vec![vec![0, 1, 4], vec![2, 3, 4], vec![0, 1, 4], vec![]])

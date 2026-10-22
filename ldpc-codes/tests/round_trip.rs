@@ -1,35 +1,22 @@
 use coding_core::{Decoder, Encoder, NoopObserver};
 use ldpc_codes::{
-    bits_to_vector, count_bit_errors, vector_to_bits, Bit, DecodeChecks, DecodeInput, DecodeResult,
-    DecodeStatus, DecoderConfig, LdpcConfigurator, LdpcDecodeOutcome, ParityCheckMatrix,
+    bits_to_vector, count_bit_errors, vector_to_bits, Bit, DecodeInput, DecodeStatus,
+    DecoderConfig, LdpcConfigurator,
 };
 
-fn decoded(outcome: LdpcDecodeOutcome) -> DecodeResult {
-    let candidate: coding_core::Candidate<DecodeResult, DecodeChecks> = match outcome {
-        coding_core::DecodeOutcome::Candidate(candidate) => candidate,
-        coding_core::DecodeOutcome::NeedMore(reason) => match reason {},
-        coding_core::DecodeOutcome::Stopped(reason) => match reason {},
-    };
-    assert_eq!(candidate.checks, candidate.value.checks());
-    candidate.value
-}
+mod common;
+#[path = "common/general_plan.rs"]
+mod general_plan;
+#[path = "common/repetition.rs"]
+mod repetition;
 
-fn main_checks() -> ParityCheckMatrix {
-    ParityCheckMatrix::try_from_rows(
-        6,
-        vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5], vec![2, 3, 5]],
-    )
-    .expect("the main example matrix is valid")
-}
-
-fn repeat_checks() -> ParityCheckMatrix {
-    ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1], vec![1, 2]])
-        .expect("the repetition-code matrix is valid")
-}
+use common::decoded;
+use general_plan::general_plan_checks;
+use repetition::repetition_checks;
 
 #[test]
 fn noiseless_round_trip_preserves_zero_and_trailing_zero_messages() {
-    let mut configured = LdpcConfigurator::build(main_checks(), DecoderConfig::default())
+    let mut configured = LdpcConfigurator::build(general_plan_checks(), DecoderConfig::default())
         .expect("rank three gives a valid three-bit message");
     assert_eq!(configured.encoder().message_len(), 3);
     assert_eq!(configured.encoder().information_positions(), &[3, 4, 5]);
@@ -90,7 +77,7 @@ fn spa_corrects_the_planned_channel_values_and_round_trips_the_message() {
     let message_vector = bits_to_vector(&[Bit::One]);
     let message = vector_to_bits(&message_vector).expect("GF(2) values are bits");
     let mut configured = LdpcConfigurator::build(
-        repeat_checks(),
+        repetition_checks(),
         DecoderConfig::try_new(1, 20.0).expect("the LLR limit is valid"),
     )
     .expect("the repetition code has a valid encoder rank");
@@ -131,7 +118,7 @@ fn spa_corrects_the_planned_channel_values_and_round_trips_the_message() {
 #[test]
 fn exhausted_iteration_budget_reports_status_without_extracting_message() {
     let mut configured = LdpcConfigurator::build(
-        repeat_checks(),
+        repetition_checks(),
         DecoderConfig::try_new(0, 20.0).expect("zero iterations is a valid budget"),
     )
     .expect("the repetition code has a valid encoder rank");

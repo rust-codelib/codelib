@@ -1,32 +1,18 @@
-use coding_core::{Decoder, NoopObserver, Observer};
+use coding_core::{Decoder, NoopObserver};
 use ldpc_codes::{
-    Bit, DecodeChecks, DecodeEvent, DecodeInput, DecodeResult, DecodeStatus, DecoderConfig,
-    LdpcDecodeOutcome, LdpcError, ParityCheckMatrix, SpaDecoder,
+    Bit, DecodeEvent, DecodeInput, DecodeStatus, DecoderConfig, LdpcError, ParityCheckMatrix,
+    SpaDecoder,
 };
 
-#[derive(Default)]
-struct Events(Vec<DecodeEvent>);
+mod common;
+#[path = "common/events.rs"]
+mod events;
+#[path = "common/repetition.rs"]
+mod repetition;
 
-impl Observer<DecodeEvent> for Events {
-    fn on_event(&mut self, event: &DecodeEvent) {
-        self.0.push(*event);
-    }
-}
-
-fn checks() -> ParityCheckMatrix {
-    ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1], vec![1, 2]])
-        .expect("the hand-calculated matrix is valid")
-}
-
-fn decoded(outcome: LdpcDecodeOutcome) -> DecodeResult {
-    let candidate: coding_core::Candidate<DecodeResult, DecodeChecks> = match outcome {
-        coding_core::DecodeOutcome::Candidate(candidate) => candidate,
-        coding_core::DecodeOutcome::NeedMore(reason) => match reason {},
-        coding_core::DecodeOutcome::Stopped(reason) => match reason {},
-    };
-    assert_eq!(candidate.checks, candidate.value.checks());
-    candidate.value
-}
+use common::decoded;
+use events::Events;
+use repetition::repetition_checks;
 
 #[test]
 fn hand_calculated_two_step_decode_obeys_budgets_and_reports_events() {
@@ -94,7 +80,8 @@ fn hand_calculated_two_step_decode_obeys_budgets_and_reports_events() {
     ) in expected
     {
         let config = DecoderConfig::try_new(budget, 20.0).expect("the configuration is valid");
-        let mut decoder = SpaDecoder::try_new(checks(), config).expect("the matrix is valid");
+        let mut decoder =
+            SpaDecoder::try_new(repetition_checks(), config).expect("the matrix is valid");
         assert_eq!(decoder.codeword_len(), 3);
         let llrs = [2.0, -3.0, 4.0];
         let mut events = Events::default();
@@ -137,7 +124,7 @@ fn hand_calculated_two_step_decode_obeys_budgets_and_reports_events() {
         assert_eq!(llrs, [2.0, -3.0, 4.0]);
 
         let mut unobserved_decoder =
-            SpaDecoder::try_new(checks(), config).expect("the matrix is valid");
+            SpaDecoder::try_new(repetition_checks(), config).expect("the matrix is valid");
         let unobserved_result = decoded(
             unobserved_decoder
                 .decode(
@@ -176,8 +163,8 @@ fn hand_calculated_two_step_decode_obeys_budgets_and_reports_events() {
 
 #[test]
 fn initially_satisfied_word_stops_before_the_first_iteration() {
-    let mut decoder =
-        SpaDecoder::try_new(checks(), DecoderConfig::default()).expect("the matrix is valid");
+    let mut decoder = SpaDecoder::try_new(repetition_checks(), DecoderConfig::default())
+        .expect("the matrix is valid");
     let llrs = [2.0, 3.0, 4.0];
     let mut events = Events::default();
 
@@ -244,7 +231,7 @@ fn decoder_construction_accepts_any_valid_parity_check_matrix() {
 #[test]
 fn input_errors_keep_their_priority_emit_nothing_and_do_not_poison_the_next_block() {
     let config = DecoderConfig::try_new(2, 20.0).expect("valid configuration");
-    let mut decoder = SpaDecoder::try_new(checks(), config).expect("valid matrix");
+    let mut decoder = SpaDecoder::try_new(repetition_checks(), config).expect("valid matrix");
 
     let first_llrs = [2.0, -3.0, 4.0];
     let mut first_events = Events::default();
@@ -307,7 +294,8 @@ fn input_errors_keep_their_priority_emit_nothing_and_do_not_poison_the_next_bloc
             )
             .expect("a valid block after errors is independent"),
     );
-    let mut fresh_decoder = SpaDecoder::try_new(checks(), config).expect("fresh decoder is valid");
+    let mut fresh_decoder =
+        SpaDecoder::try_new(repetition_checks(), config).expect("fresh decoder is valid");
     let fresh_result = decoded(
         fresh_decoder
             .decode(
@@ -333,7 +321,7 @@ fn input_errors_keep_their_priority_emit_nothing_and_do_not_poison_the_next_bloc
 #[test]
 fn non_finite_llrs_are_rejected_even_when_erased_without_events() {
     let config = DecoderConfig::try_new(2, 20.0).expect("valid configuration");
-    let mut decoder = SpaDecoder::try_new(checks(), config).expect("valid matrix");
+    let mut decoder = SpaDecoder::try_new(repetition_checks(), config).expect("valid matrix");
     let initial_llrs = [2.0, -3.0, 4.0];
     let previous = decoded(
         decoder
@@ -377,7 +365,8 @@ fn non_finite_llrs_are_rejected_even_when_erased_without_events() {
             )
             .expect("the next valid block remains independent"),
     );
-    let mut fresh_decoder = SpaDecoder::try_new(checks(), config).expect("fresh decoder is valid");
+    let mut fresh_decoder =
+        SpaDecoder::try_new(repetition_checks(), config).expect("fresh decoder is valid");
     let fresh_result = decoded(
         fresh_decoder
             .decode(
@@ -397,7 +386,7 @@ fn non_finite_llrs_are_rejected_even_when_erased_without_events() {
 #[test]
 fn zero_iteration_budget_checks_the_initial_syndrome_first() {
     let config = DecoderConfig::try_new(0, 20.0).expect("zero budget is valid");
-    let mut decoder = SpaDecoder::try_new(checks(), config).expect("valid matrix");
+    let mut decoder = SpaDecoder::try_new(repetition_checks(), config).expect("valid matrix");
 
     let satisfied_llrs = [2.0, 3.0, 4.0];
     let satisfied = decoded(
@@ -488,7 +477,7 @@ fn erasures_define_the_initial_word_and_changed_bits_baseline() {
 #[test]
 fn zero_llrs_and_all_erasures_start_at_the_zero_codeword() {
     let config = DecoderConfig::try_new(5, 20.0).expect("valid configuration");
-    let mut decoder = SpaDecoder::try_new(checks(), config).expect("valid matrix");
+    let mut decoder = SpaDecoder::try_new(repetition_checks(), config).expect("valid matrix");
 
     for (llrs, erasures) in [
         ([0.0, -0.0, 0.0], &[][..]),
@@ -662,7 +651,7 @@ fn empty_and_repeated_checks_keep_syndrome_order_and_observer_is_observational()
 
 #[test]
 fn a_satisfied_word_can_still_differ_from_the_transmitted_word() {
-    let mut decoder = SpaDecoder::try_new(checks(), DecoderConfig::default())
+    let mut decoder = SpaDecoder::try_new(repetition_checks(), DecoderConfig::default())
         .expect("valid repetition-code matrix");
     let transmitted = [Bit::One; 3];
     let result = decoded(

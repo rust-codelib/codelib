@@ -1,20 +1,13 @@
 use coding_core::{Decoder, Encoder, NoopObserver};
 use ldpc_codes::{
-    bits_to_vector, count_bit_errors, vector_to_bits, Bit, ConfiguredLdpc, DecodeChecks,
-    DecodeInput, DecodeResult, DecodeStatus, DecoderConfig, LdpcConfigurator, LdpcDecodeOutcome,
-    ParityCheckMatrix,
+    bits_to_vector, count_bit_errors, vector_to_bits, Bit, ConfiguredLdpc, DecodeInput,
+    DecodeStatus, DecoderConfig, LdpcConfigurator, ParityCheckMatrix,
 };
 use proptest::prelude::*;
 
-fn decoded(outcome: LdpcDecodeOutcome) -> DecodeResult {
-    let candidate: coding_core::Candidate<DecodeResult, DecodeChecks> = match outcome {
-        coding_core::DecodeOutcome::Candidate(candidate) => candidate,
-        coding_core::DecodeOutcome::NeedMore(reason) => match reason {},
-        coding_core::DecodeOutcome::Stopped(reason) => match reason {},
-    };
-    assert_eq!(candidate.checks, candidate.value.checks());
-    candidate.value
-}
+mod common;
+
+use common::decoded;
 
 #[derive(Clone, Debug)]
 struct CodecCase {

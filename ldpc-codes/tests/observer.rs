@@ -1,32 +1,17 @@
-use coding_core::{Decoder, NoopObserver, Observer};
+use coding_core::{Decoder, NoopObserver};
 use ldpc_codes::{
-    Bit, DecodeChecks, DecodeEvent, DecodeInput, DecodeResult, DecodeStatus, DecoderConfig,
-    LdpcDecodeOutcome, LdpcError, ParityCheckMatrix, SpaDecoder,
+    Bit, DecodeEvent, DecodeInput, DecodeStatus, DecoderConfig, LdpcError, SpaDecoder,
 };
 
-#[derive(Default)]
-struct Events(Vec<DecodeEvent>);
+mod common;
+#[path = "common/events.rs"]
+mod events;
+#[path = "common/repetition.rs"]
+mod repetition;
 
-impl Observer<DecodeEvent> for Events {
-    fn on_event(&mut self, event: &DecodeEvent) {
-        self.0.push(*event);
-    }
-}
-
-fn checks() -> ParityCheckMatrix {
-    ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1], vec![1, 2]])
-        .expect("the hand-calculated matrix is valid")
-}
-
-fn decoded(outcome: LdpcDecodeOutcome) -> DecodeResult {
-    let candidate: coding_core::Candidate<DecodeResult, DecodeChecks> = match outcome {
-        coding_core::DecodeOutcome::Candidate(candidate) => candidate,
-        coding_core::DecodeOutcome::NeedMore(reason) => match reason {},
-        coding_core::DecodeOutcome::Stopped(reason) => match reason {},
-    };
-    assert_eq!(candidate.checks, candidate.value.checks());
-    candidate.value
-}
+use common::decoded;
+use events::Events;
+use repetition::repetition_checks;
 
 #[test]
 fn event_order_and_contents_match_zero_one_and_two_iteration_results() {
@@ -94,7 +79,7 @@ fn event_order_and_contents_match_zero_one_and_two_iteration_results() {
     ) in expected
     {
         let config = DecoderConfig::try_new(budget, 20.0).expect("valid configuration");
-        let mut decoder = SpaDecoder::try_new(checks(), config).expect("valid matrix");
+        let mut decoder = SpaDecoder::try_new(repetition_checks(), config).expect("valid matrix");
         let llrs = [2.0, -3.0, 4.0];
         let mut events = Events::default();
 
@@ -135,7 +120,7 @@ fn event_order_and_contents_match_zero_one_and_two_iteration_results() {
         assert_eq!(events.0, expected_events);
 
         let mut decoder_without_observer =
-            SpaDecoder::try_new(checks(), config).expect("valid matrix");
+            SpaDecoder::try_new(repetition_checks(), config).expect("valid matrix");
         let result_without_observer = decoded(
             decoder_without_observer
                 .decode(
@@ -154,7 +139,7 @@ fn event_order_and_contents_match_zero_one_and_two_iteration_results() {
 #[test]
 fn an_initially_satisfied_word_emits_started_then_finished_without_iterations() {
     let config = DecoderConfig::try_new(0, 20.0).expect("valid configuration");
-    let mut decoder = SpaDecoder::try_new(checks(), config).expect("valid matrix");
+    let mut decoder = SpaDecoder::try_new(repetition_checks(), config).expect("valid matrix");
     let llrs = [2.0, 3.0, 4.0];
     let mut events = Events::default();
 
@@ -194,7 +179,7 @@ fn an_initially_satisfied_word_emits_started_then_finished_without_iterations() 
 #[test]
 fn invalid_input_emits_no_events() {
     let config = DecoderConfig::try_new(2, 20.0).expect("valid configuration");
-    let mut decoder = SpaDecoder::try_new(checks(), config).expect("valid matrix");
+    let mut decoder = SpaDecoder::try_new(repetition_checks(), config).expect("valid matrix");
     let mut events = Events::default();
 
     let short_llrs = [1.0, 2.0];

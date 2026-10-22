@@ -9,18 +9,16 @@ use ldpc_codes::{
     SystematicEncoder,
 };
 
-fn two_check_three_bit_matrix() -> ParityCheckMatrix {
-    ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1], vec![1, 2]])
-        .expect("the hand-calculated matrix is valid")
-}
+#[path = "common/events.rs"]
+mod events;
+#[path = "common/general_plan.rs"]
+mod general_plan;
+#[path = "common/repetition.rs"]
+mod repetition;
 
-fn main_example_matrix() -> ParityCheckMatrix {
-    ParityCheckMatrix::try_from_rows(
-        6,
-        vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5], vec![2, 3, 5]],
-    )
-    .expect("the general-plan matrix is valid")
-}
+use events::Events;
+use general_plan::general_plan_checks;
+use repetition::repetition_checks;
 
 fn repeated_and_empty_rows() -> ParityCheckMatrix {
     ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1], vec![1, 2], vec![0, 1], vec![]])
@@ -147,15 +145,6 @@ fn strong_llrs(word: &[Bit]) -> Vec<f64> {
 }
 
 #[derive(Default)]
-struct Events(Vec<DecodeEvent>);
-
-impl Observer<DecodeEvent> for Events {
-    fn on_event(&mut self, event: &DecodeEvent) {
-        self.0.push(*event);
-    }
-}
-
-#[derive(Default)]
 struct UnitEvents(usize);
 
 impl Observer<()> for UnitEvents {
@@ -166,7 +155,7 @@ impl Observer<()> for UnitEvents {
 
 #[test]
 fn successful_result_has_a_satisfied_checks_summary() {
-    let checks = two_check_three_bit_matrix();
+    let checks = repetition_checks();
     let initial_word = [Bit::Zero; 3];
     let result = DecodeResult::try_new(
         &checks,
@@ -185,7 +174,7 @@ fn successful_result_has_a_satisfied_checks_summary() {
 
 #[test]
 fn converged_result_summary_uses_the_final_syndrome() {
-    let checks = two_check_three_bit_matrix();
+    let checks = repetition_checks();
     let initial_word = [Bit::One, Bit::Zero, Bit::Zero];
     let result = DecodeResult::try_new(
         &checks,
@@ -223,7 +212,7 @@ fn unsatisfied_summary_counts_repeated_rows_and_ignores_an_empty_row() {
 
 #[test]
 fn alias_names_the_decode_result_and_checks_contract() {
-    let checks = two_check_three_bit_matrix();
+    let checks = repetition_checks();
     let result = DecodeResult::try_new(
         &checks,
         &[Bit::Zero; 3],
@@ -266,8 +255,8 @@ fn all_implementations_expose_the_documented_associated_types() {
 
 #[test]
 fn generic_calls_accept_inputs_from_short_local_scopes() {
-    let mut encoder = SystematicEncoder::try_new(two_check_three_bit_matrix())
-        .expect("rank one gives a one-bit message");
+    let mut encoder =
+        SystematicEncoder::try_new(repetition_checks()).expect("rank one gives a one-bit message");
     let word = {
         let message = [Bit::One];
         encode_generic(&mut encoder, &message)
@@ -275,7 +264,7 @@ fn generic_calls_accept_inputs_from_short_local_scopes() {
     assert_eq!(word.0, [Bit::One, Bit::One, Bit::One]);
     assert_eq!(encoder.extract_message(&word.0), Ok(vec![Bit::One]));
 
-    let mut decoder = SpaDecoder::try_new(two_check_three_bit_matrix(), DecoderConfig::default())
+    let mut decoder = SpaDecoder::try_new(repetition_checks(), DecoderConfig::default())
         .expect("the matrix is valid");
     let candidate = {
         let llrs = [2.0, 3.0, 4.0];
@@ -292,7 +281,7 @@ fn generic_calls_accept_inputs_from_short_local_scopes() {
 #[test]
 fn successful_and_limit_outcomes_are_candidates_with_consistent_checks() {
     let mut decoder = SpaDecoder::try_new(
-        two_check_three_bit_matrix(),
+        repetition_checks(),
         DecoderConfig::try_new(1, 20.0).expect("the configuration is valid"),
     )
     .expect("the matrix is valid");
@@ -314,7 +303,7 @@ fn successful_and_limit_outcomes_are_candidates_with_consistent_checks() {
     assert!(converged.checks.parity_satisfied());
 
     let mut zero_budget = SpaDecoder::try_new(
-        two_check_three_bit_matrix(),
+        repetition_checks(),
         DecoderConfig::try_new(0, 20.0).expect("zero iterations is a valid budget"),
     )
     .expect("the matrix is valid");
@@ -339,7 +328,7 @@ fn successful_and_limit_outcomes_are_candidates_with_consistent_checks() {
 
 #[test]
 fn the_encoder_is_silent_for_user_and_closure_observers() {
-    let mut encoder = SystematicEncoder::try_new(main_example_matrix())
+    let mut encoder = SystematicEncoder::try_new(general_plan_checks())
         .expect("rank three gives a three-bit message");
     let message = [Bit::Zero, Bit::One, Bit::One];
     let mut unit_events = UnitEvents::default();
@@ -362,7 +351,7 @@ fn the_encoder_is_silent_for_user_and_closure_observers() {
 
 #[test]
 fn decoder_observes_through_a_user_type_a_closure_and_noop_with_the_same_result() {
-    let checks = two_check_three_bit_matrix();
+    let checks = repetition_checks();
     let config = DecoderConfig::try_new(2, 20.0).expect("the configuration is valid");
     let llrs = [2.0, -3.0, 4.0];
     let input = DecodeInput {
@@ -422,7 +411,7 @@ fn decoder_observes_through_a_user_type_a_closure_and_noop_with_the_same_result(
 
 #[test]
 fn input_errors_emit_no_events_do_not_poison_reuse_or_change_old_candidates() {
-    let checks = two_check_three_bit_matrix();
+    let checks = repetition_checks();
     let config = DecoderConfig::try_new(2, 20.0).expect("the configuration is valid");
     let mut decoder = SpaDecoder::try_new(checks.clone(), config).expect("valid matrix");
     let first_llrs = [2.0, -3.0, 4.0];
@@ -489,7 +478,7 @@ fn input_errors_emit_no_events_do_not_poison_reuse_or_change_old_candidates() {
 
 #[test]
 fn configured_pair_matches_its_standalone_encoder_and_decoder() {
-    let checks = main_example_matrix();
+    let checks = general_plan_checks();
     let config = DecoderConfig::default();
     let mut configured =
         LdpcConfigurator::build(checks.clone(), config).expect("the matrix has an encoder rank");
@@ -555,7 +544,7 @@ fn configured_pair_matches_its_standalone_encoder_and_decoder() {
 
 #[test]
 fn information_bits_live_at_information_positions_not_the_word_prefix() {
-    let mut configured = LdpcConfigurator::build(main_example_matrix(), DecoderConfig::default())
+    let mut configured = LdpcConfigurator::build(general_plan_checks(), DecoderConfig::default())
         .expect("the matrix has an encoder rank");
     assert_eq!(configured.encoder().information_positions(), &[3, 4, 5]);
 
@@ -578,9 +567,8 @@ fn information_bits_live_at_information_positions_not_the_word_prefix() {
 
 #[test]
 fn sizes_follow_the_shared_bit_to_byte_limit() {
-    let configured =
-        LdpcConfigurator::build(two_check_three_bit_matrix(), DecoderConfig::default())
-            .expect("the matrix has an encoder rank");
+    let configured = LdpcConfigurator::build(repetition_checks(), DecoderConfig::default())
+        .expect("the matrix has an encoder rank");
     assert_eq!(configured.message_len(), 1);
     assert_eq!(configured.codeword_len(), 3);
     assert!(MessageBytes::from_bits(configured.message_len()).is_ok());
