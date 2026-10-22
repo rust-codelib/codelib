@@ -1,6 +1,7 @@
 use coding_core::{DecodeOutcome, Decoder as _, NoopObserver};
 
 use super::*;
+use crate::test_support::prepared_channel;
 use crate::{Bit, DecodeInput, DecodeStatus, DecoderConfig, LdpcError, ParityCheckMatrix};
 use proptest::prelude::*;
 use proptest::test_runner::FileFailurePersistence;

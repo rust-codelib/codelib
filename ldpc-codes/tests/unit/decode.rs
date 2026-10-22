@@ -1,23 +1,13 @@
-use super::{prepare_channel, DecodeInput};
+use super::DecodeInput;
+use crate::test_support::prepared_channel;
 use crate::{DecoderConfig, LdpcError};
-
-fn prepare(
-    input: DecodeInput<'_>,
-    bits: usize,
-    config: DecoderConfig,
-) -> Result<Vec<f64>, LdpcError> {
-    let mut channel = vec![0.0; bits];
-    let mut erased_positions = vec![false; bits];
-    prepare_channel(input, &mut channel, &mut erased_positions, config)?;
-    Ok(channel)
-}
 
 #[test]
 fn preparation_clips_extreme_finite_values_and_zeroes_erasures() {
     let llrs = [f64::MAX, -f64::MAX, 1.25, -2.5];
     let erasures = [2];
 
-    let channel = prepare(
+    let channel = prepared_channel(
         DecodeInput {
             llrs: &llrs,
             erasures: &erasures,
@@ -36,7 +26,7 @@ fn preparation_clips_extreme_finite_values_and_zeroes_erasures() {
 fn preparation_accepts_no_erasures_and_erasing_every_bit() {
     let llrs = [-30.0, 4.0, 30.0];
     let config = DecoderConfig::default();
-    let unerased = prepare(
+    let unerased = prepared_channel(
         DecodeInput {
             llrs: &llrs,
             erasures: &[],
@@ -45,7 +35,7 @@ fn preparation_accepts_no_erasures_and_erasing_every_bit() {
         config,
     )
     .expect("an empty erasure list is valid");
-    let fully_erased = prepare(
+    let fully_erased = prepared_channel(
         DecodeInput {
             llrs: &llrs,
             erasures: &[0, 1, 2],
@@ -65,7 +55,7 @@ fn length_mismatch_is_reported_before_other_input_errors() {
     let llrs = [f64::NAN];
     let erasures = [9, 9];
 
-    let error = prepare(
+    let error = prepared_channel(
         DecodeInput {
             llrs: &llrs,
             erasures: &erasures,
@@ -89,7 +79,7 @@ fn non_finite_erased_llr_is_reported_before_erasure_errors() {
     let llrs = [1.0, f64::INFINITY, f64::NAN];
     let erasures = [3, 1];
 
-    let error = prepare(
+    let error = prepared_channel(
         DecodeInput {
             llrs: &llrs,
             erasures: &erasures,
@@ -111,7 +101,7 @@ fn erasure_bounds_are_checked_before_duplicate_positions() {
     let llrs = [0.0; 3];
     let erasures = [1, 1, 3];
 
-    let error = prepare(
+    let error = prepared_channel(
         DecodeInput {
             llrs: &llrs,
             erasures: &erasures,
@@ -132,7 +122,7 @@ fn the_first_repeated_erasure_is_reported() {
     let llrs = [0.0; 3];
     let erasures = [2, 1, 2, 1];
 
-    let error = prepare(
+    let error = prepared_channel(
         DecodeInput {
             llrs: &llrs,
             erasures: &erasures,

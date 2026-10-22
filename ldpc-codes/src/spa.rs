@@ -9,8 +9,6 @@ mod state;
 use coding_core::{Candidate, DecodeOutcome, Observer};
 
 use crate::bit::{bit_distance, count_ones};
-#[cfg(test)]
-use crate::decode::prepared_channel;
 use crate::{
     Bit, DecodeChecks, DecodeEvent, DecodeInput, DecodeResult, DecodeStatus, DecoderConfig,
     LdpcDecodeOutcome, LdpcError, ParityCheckMatrix,

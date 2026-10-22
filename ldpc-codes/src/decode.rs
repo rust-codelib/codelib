@@ -95,18 +95,12 @@ pub(crate) fn prepare_channel(
     Ok(())
 }
 
-// Keeps the independent reference tests focused on input semantics while the
-// production decoder writes into its reusable buffers.
-#[cfg(test)]
-pub(crate) fn prepared_channel(
-    input: DecodeInput<'_>,
-    bits: usize,
-    config: crate::DecoderConfig,
-) -> Result<Vec<f64>, crate::LdpcError> {
-    let mut channel = vec![0.0; bits];
-    let mut erased_positions = vec![false; bits];
-    prepare_channel(input, &mut channel, &mut erased_positions, config)?;
-    Ok(channel)
+pub(crate) fn hard_decision(llr: f64) -> Bit {
+    if llr >= 0.0 {
+        Bit::Zero
+    } else {
+        Bit::One
+    }
 }
 
 const MAX_LLR_LIMIT: f64 = 20.0;
@@ -258,7 +252,7 @@ impl DecodeResult {
 
         let word: Vec<_> = posterior_llrs
             .iter()
-            .map(|&llr| if llr >= 0.0 { Bit::Zero } else { Bit::One })
+            .map(|&llr| hard_decision(llr))
             .collect();
         let syndrome = checks.syndrome(&word)?;
         let initial_syndrome = checks.syndrome(initial_word)?;

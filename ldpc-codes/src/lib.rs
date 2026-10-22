@@ -21,3 +21,7 @@ pub use encoder::SystematicEncoder;
 pub use error::LdpcError;
 pub use parity_check::ParityCheckMatrix;
 pub use spa::{spa_step, SpaDecoder, SpaStepResult};
+
+#[cfg(test)]
+#[path = "../tests/unit/support.rs"]
+mod test_support;

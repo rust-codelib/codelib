@@ -1,7 +1,7 @@
 use super::graph::{checked_workspace_sizes, SparseGraph};
 use super::SpaStepResult;
 use crate::bit::bit_parity;
-use crate::decode::prepare_channel;
+use crate::decode::{hard_decision, prepare_channel};
 use crate::{Bit, DecodeInput, DecoderConfig, LdpcError, ParityCheckMatrix};
 
 #[derive(Debug)]
@@ -156,14 +156,6 @@ impl SpaState {
             word: self.word,
             posterior_llrs: self.posterior,
         }
-    }
-}
-
-fn hard_decision(llr: f64) -> Bit {
-    if llr >= 0.0 {
-        Bit::Zero
-    } else {
-        Bit::One
     }
 }
 
