@@ -15,8 +15,6 @@ use crate::{
     Bit, DecodeChecks, DecodeEvent, DecodeInput, DecodeResult, DecodeStatus, DecoderConfig,
     LdpcDecodeOutcome, LdpcError, ParityCheckMatrix,
 };
-#[cfg(test)]
-use state::float_bits;
 use state::SpaState;
 
 /// Жёсткое слово и итоговые LLR после одного шага SPA.
@@ -221,6 +219,10 @@ pub fn spa_step(
     state.step(config);
     Ok(state.into_result())
 }
+
+#[cfg(test)]
+#[path = "../tests/unit/spa/support.rs"]
+mod support;
 
 #[cfg(test)]
 #[path = "../tests/unit/spa/mod.rs"]
