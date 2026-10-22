@@ -12,26 +12,21 @@ pub struct LdpcConfigurator;
 
 /// Согласованные кодер и декодер одного двоичного LDPC-кода.
 ///
-/// Поля закрыты: пара появляется только после успешной подготовки и кодера,
-/// и декодера по одной исходной проверочной матрице. Пара реализует общие
+/// Поля закрыты: пара появляется только после успешной подготовки обоих
+/// компонентов по одной исходной `H`. Пара реализует
 /// [`coding_core::Encoder<&[Bit]>`] и [`coding_core::Decoder<DecodeInput<'_>>`];
 /// внутренние компоненты нельзя заменить отдельно.
 ///
-/// Кодирование выполняют через `self.encode(...)`, а не через неизменяемый
-/// [`Self::encoder`]: общему кодеру нужна изменяемая ссылка на пару. Метаданные
-/// и извлечение сообщения остаются доступны через [`Self::encoder`].
+/// Кодировать нужно саму пару через `self.encode(...)`: [`Self::encoder`]
+/// возвращает неизменяемую ссылку для метаданных и извлечения сообщения.
 ///
-/// Попытка получить изменяемую ссылку на внутренний декодер не компилируется:
+/// Получение изменяемой ссылки на внутренний декодер не компилируется:
 ///
 /// ```compile_fail,E0599
-/// use ldpc_codes::{DecoderConfig, LdpcConfigurator, ParityCheckMatrix, SpaDecoder};
+/// use ldpc_codes::{ConfiguredLdpc, SpaDecoder};
 ///
-/// fn main() -> Result<(), ldpc_codes::LdpcError> {
-///     let checks = ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1], vec![1, 2]])?;
-///     let mut code = LdpcConfigurator::build(checks, DecoderConfig::default())?;
-///     let other_checks = ParityCheckMatrix::try_from_rows(3, vec![vec![0]])?;
-///     *code.decoder_mut() = SpaDecoder::try_new(other_checks, DecoderConfig::default())?;
-///     Ok(())
+/// fn replace_decoder(code: &mut ConfiguredLdpc, decoder: SpaDecoder) {
+///     *code.decoder_mut() = decoder;
 /// }
 /// ```
 #[derive(Debug)]
@@ -43,12 +38,7 @@ pub struct ConfiguredLdpc {
 impl LdpcConfigurator {
     /// Строит систематический кодер и SPA-декодер по одной матрице `H`.
     ///
-    /// Сначала готовится кодер, который сохраняет исходную матрицу, вычисляет
-    /// ранг одним приведением `H` к RREF и определяет длину сообщения и
-    /// информационные позиции. После успешного создания кодера декодер
-    /// строит граф по ссылке на сохранённую матрицу, включая зависимые и
-    /// пустые строки. Пара возвращается только после успешной подготовки обоих
-    /// компонентов.
+    /// Пара возвращается только после успешной подготовки обоих компонентов.
     ///
     /// # Ошибки
     ///
@@ -59,6 +49,8 @@ impl LdpcConfigurator {
         checks: ParityCheckMatrix,
         config: DecoderConfig,
     ) -> Result<ConfiguredLdpc, LdpcError> {
+        // Кодер сохраняет исходную H; декодер строит граф по ссылке на неё,
+        // включая зависимые и пустые строки.
         let encoder = SystematicEncoder::try_new(checks)?;
         let decoder = SpaDecoder::try_new_borrowed(encoder.checks(), config)?;
 
@@ -70,9 +62,8 @@ impl ConfiguredLdpc {
     /// Возвращает согласованный систематический кодер.
     ///
     /// Ссылка неизменяемая: через неё доступны размеры, информационные позиции
-    /// и извлечение сообщения. Кодировать нужно саму пару через
-    /// [`coding_core::Encoder::encode`], иначе внутренний кодер нельзя было бы
-    /// изменяемо позаимствовать при сохранении закрытой пары.
+    /// и извлечение сообщения. Для кодирования используйте
+    /// [`coding_core::Encoder::encode`] у самой пары.
     #[must_use]
     pub fn encoder(&self) -> &SystematicEncoder {
         &self.encoder
@@ -93,8 +84,8 @@ impl ConfiguredLdpc {
 
 /// Кодирует сообщение согласованным систематическим кодером.
 ///
-/// Слово возвращается в порядке столбцов исходной `H`, информационные биты
-/// стоят в [`SystematicEncoder::information_positions`]. Событий нет, поэтому
+/// Контракт совпадает с [`SystematicEncoder`], включая порядок слова и
+/// [`SystematicEncoder::information_positions`]. Событий нет, поэтому
 /// наблюдатель не вызывается.
 impl<'a> coding_core::Encoder<&'a [Bit]> for ConfiguredLdpc {
     type Output = Codeword<Vec<Bit>>;
@@ -112,11 +103,9 @@ impl<'a> coding_core::Encoder<&'a [Bit]> for ConfiguredLdpc {
 
 /// Декодирует один блок SPA-декодером, согласованным с кодером.
 ///
-/// Контракт совпадает с реализацией у [`SpaDecoder`]: кандидат возвращается и
-/// при исчерпании бюджета, включая бюджет `0`. Декодер остаётся связан с
-/// исходной проверочной матрицей пары и повторно использует своё состояние
-/// между вызовами. Ошибки входа не отправляют событий и не портят следующий
-/// корректный вызов.
+/// Контракт совпадает с [`SpaDecoder`], включая кандидат при исчерпании
+/// бюджета (в том числе `0`), повторное использование состояния и отсутствие
+/// событий при ошибке входа.
 impl<'a> coding_core::Decoder<DecodeInput<'a>> for ConfiguredLdpc {
     type Value = DecodeResult;
     type Checks = DecodeChecks;
