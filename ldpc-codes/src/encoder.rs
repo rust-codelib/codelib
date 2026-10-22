@@ -1,49 +1,9 @@
+use coding_core::{Codeword, Observer};
 use gf_linalg::Matrix;
 
 use crate::bit::count_ones;
 use crate::size::check_buffer_bytes;
 use crate::{bits_to_vector, vector_to_bits, Bit, Gf2, LdpcError, ParityCheckMatrix};
-
-/// Общий контракт систематического кодера двоичного блока.
-///
-/// Длина сообщения и слова определяется конкретным кодером. Методы читают
-/// входные срезы и не изменяют ни их, ни состояние кодера.
-pub trait Encoder {
-    /// Возвращает число информационных битов `k`.
-    fn message_len(&self) -> usize;
-
-    /// Возвращает число битов кодового слова `n`.
-    fn codeword_len(&self) -> usize;
-
-    /// Кодирует сообщение длины `k` в слово длины `n`.
-    ///
-    /// Информационные биты сохраняются в позициях, заданных кодером; итоговое
-    /// слово возвращается в порядке столбцов исходной проверочной матрицы. Для
-    /// [`SystematicEncoder`] бит `message[j]` находится в
-    /// `word[SystematicEncoder::information_positions()[j]]`.
-    ///
-    /// # Errors
-    ///
-    /// Возвращает [`LdpcError::MessageLengthMismatch`], если длина сообщения
-    /// не равна [`message_len`](Self::message_len), или ошибку линейной
-    /// алгебры/преобразования, если соответствующая операция завершилась
-    /// ошибкой.
-    fn encode(&self, message: &[Bit]) -> Result<Vec<Bit>, LdpcError>;
-
-    /// Извлекает сообщение из допустимого кодового слова длины `n`.
-    ///
-    /// Сначала проверяется длина слова, затем его синдром по исходной
-    /// проверочной матрице. Метод не исправляет ошибки и не определяет, какое
-    /// допустимое слово было передано. Любое другое слово с нулевым синдромом
-    /// также принимается.
-    ///
-    /// # Errors
-    ///
-    /// Возвращает [`LdpcError::WordLengthMismatch`], если длина слова неверна,
-    /// или [`LdpcError::InvalidCodeword`], если слово нарушает исходные
-    /// проверки.
-    fn extract_message(&self, word: &[Bit]) -> Result<Vec<Bit>, LdpcError>;
-}
 
 fn dense_from_checks(checks: &ParityCheckMatrix) -> Result<Matrix<Gf2>, LdpcError> {
     let rows = checks.rows();
@@ -141,6 +101,50 @@ impl SystematicEncoder {
         })
     }
 
+    /// Возвращает число информационных битов `k`.
+    #[must_use]
+    pub fn message_len(&self) -> usize {
+        self.parity_coefficients.cols()
+    }
+
+    /// Возвращает число битов кодового слова `n`.
+    #[must_use]
+    pub fn codeword_len(&self) -> usize {
+        self.checks.cols()
+    }
+
+    /// Извлекает сообщение из допустимого кодового слова длины `n`.
+    ///
+    /// Сначала проверяется длина слова, затем его синдром по исходной
+    /// проверочной матрице. Метод не исправляет ошибки и не определяет, какое
+    /// допустимое слово было передано. Любое другое слово с нулевым синдромом
+    /// также принимается.
+    ///
+    /// # Errors
+    ///
+    /// Возвращает [`LdpcError::WordLengthMismatch`], если длина слова неверна,
+    /// или [`LdpcError::InvalidCodeword`], если слово нарушает исходные
+    /// проверки.
+    pub fn extract_message(&self, word: &[Bit]) -> Result<Vec<Bit>, LdpcError> {
+        let expected = self.codeword_len();
+        if word.len() != expected {
+            return Err(LdpcError::WordLengthMismatch {
+                expected,
+                actual: word.len(),
+            });
+        }
+
+        let unsatisfied_checks = count_ones(&self.checks.syndrome(word)?);
+        if unsatisfied_checks != 0 {
+            return Err(LdpcError::InvalidCodeword { unsatisfied_checks });
+        }
+
+        Ok(self.systematic_to_original[..self.message_len()]
+            .iter()
+            .map(|&position| word[position])
+            .collect())
+    }
+
     /// Возвращает ранг исходной проверочной матрицы.
     #[must_use]
     pub fn rank(&self) -> usize {
@@ -166,16 +170,29 @@ impl SystematicEncoder {
     }
 }
 
-impl Encoder for SystematicEncoder {
-    fn message_len(&self) -> usize {
-        self.parity_coefficients.cols()
-    }
+/// Кодирует сообщение длины `k` в слово длины `n`.
+///
+/// Информационные биты сохраняются в позициях, заданных кодером; итоговое
+/// слово возвращается в порядке столбцов исходной проверочной матрицы. Бит
+/// `message[j]` находится в
+/// `word[SystematicEncoder::information_positions()[j]]`. Общий кодер не
+/// отправляет событий, поэтому переданный наблюдатель не вызывается.
+///
+/// # Errors
+///
+/// Возвращает [`LdpcError::MessageLengthMismatch`], если длина сообщения не
+/// равна [`SystematicEncoder::message_len`], или ошибку линейной
+/// алгебры/преобразования, если соответствующая операция завершилась ошибкой.
+impl<'a> coding_core::Encoder<&'a [Bit]> for SystematicEncoder {
+    type Output = Codeword<Vec<Bit>>;
+    type Error = LdpcError;
+    type Event = ();
 
-    fn codeword_len(&self) -> usize {
-        self.checks.cols()
-    }
-
-    fn encode(&self, message: &[Bit]) -> Result<Vec<Bit>, LdpcError> {
+    fn encode(
+        &mut self,
+        message: &'a [Bit],
+        _observer: &mut dyn Observer<()>,
+    ) -> Result<Self::Output, Self::Error> {
         let expected = self.message_len();
         if message.len() != expected {
             return Err(LdpcError::MessageLengthMismatch {
@@ -198,27 +215,7 @@ impl Encoder for SystematicEncoder {
             word[position] = bit;
         }
 
-        Ok(word)
-    }
-
-    fn extract_message(&self, word: &[Bit]) -> Result<Vec<Bit>, LdpcError> {
-        let expected = self.codeword_len();
-        if word.len() != expected {
-            return Err(LdpcError::WordLengthMismatch {
-                expected,
-                actual: word.len(),
-            });
-        }
-
-        let unsatisfied_checks = count_ones(&self.checks.syndrome(word)?);
-        if unsatisfied_checks != 0 {
-            return Err(LdpcError::InvalidCodeword { unsatisfied_checks });
-        }
-
-        Ok(self.systematic_to_original[..self.message_len()]
-            .iter()
-            .map(|&position| word[position])
-            .collect())
+        Ok(Codeword(word))
     }
 }
 
@@ -226,7 +223,7 @@ impl Encoder for SystematicEncoder {
 mod tests {
     use gf_linalg::Matrix;
 
-    use crate::{encoder::dense_from_checks, Encoder, Gf2, ParityCheckMatrix, SystematicEncoder};
+    use crate::{encoder::dense_from_checks, Gf2, ParityCheckMatrix, SystematicEncoder};
 
     #[test]
     fn dense_conversion_preserves_shape_entries_and_sparse_source() {

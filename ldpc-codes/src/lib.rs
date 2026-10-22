@@ -19,13 +19,10 @@ pub use bit::Bit;
 pub use configurator::{ConfiguredLdpc, LdpcConfigurator};
 pub use conversion::{bits_to_vector, vector_to_bits, Gf2};
 pub use decode_input::DecodeInput;
-pub use decoder::{
-    DecodeChecks, DecodeEvent, DecodeObserver, DecodeResult, DecodeStatus, Decoder,
-    LdpcDecodeOutcome,
-};
+pub use decoder::{DecodeChecks, DecodeEvent, DecodeResult, DecodeStatus, LdpcDecodeOutcome};
 pub use decoder_config::DecoderConfig;
 pub use diagnostics::count_bit_errors;
-pub use encoder::{Encoder, SystematicEncoder};
+pub use encoder::SystematicEncoder;
 pub use error::LdpcError;
 pub use parity_check::ParityCheckMatrix;
 pub use spa::{spa_step, SpaDecoder, SpaStepResult};

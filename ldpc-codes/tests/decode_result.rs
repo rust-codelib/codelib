@@ -1,6 +1,9 @@
+use core::convert::Infallible;
+
+use coding_core::{Candidate, DecodeOutcome, Decoder, Observer};
 use ldpc_codes::{
-    Bit, DecodeEvent, DecodeInput, DecodeObserver, DecodeResult, DecodeStatus, Decoder, LdpcError,
-    ParityCheckMatrix,
+    Bit, DecodeChecks, DecodeEvent, DecodeInput, DecodeResult, DecodeStatus, LdpcDecodeOutcome,
+    LdpcError, ParityCheckMatrix,
 };
 
 fn checks() -> ParityCheckMatrix {
@@ -11,27 +14,40 @@ fn checks() -> ParityCheckMatrix {
 #[derive(Default)]
 struct Events(Vec<DecodeEvent>);
 
-impl DecodeObserver for Events {
+impl Observer<DecodeEvent> for Events {
     fn on_event(&mut self, event: &DecodeEvent) {
         self.0.push(*event);
     }
+}
+
+fn decoded(outcome: LdpcDecodeOutcome) -> DecodeResult {
+    let candidate: Candidate<DecodeResult, DecodeChecks> = match outcome {
+        DecodeOutcome::Candidate(candidate) => candidate,
+        DecodeOutcome::NeedMore(reason) => match reason {},
+        DecodeOutcome::Stopped(reason) => match reason {},
+    };
+    assert_eq!(candidate.checks, candidate.value.checks());
+    candidate.value
 }
 
 struct ExternalDecoder {
     checks: ParityCheckMatrix,
 }
 
-impl Decoder for ExternalDecoder {
-    fn codeword_len(&self) -> usize {
-        self.checks.cols()
-    }
+impl<'a> Decoder<DecodeInput<'a>> for ExternalDecoder {
+    type Value = DecodeResult;
+    type Checks = DecodeChecks;
+    type NeedMore = Infallible;
+    type StopReason = Infallible;
+    type Error = LdpcError;
+    type Event = DecodeEvent;
 
     fn decode(
         &mut self,
-        input: DecodeInput<'_>,
-        observer: Option<&mut dyn DecodeObserver>,
-    ) -> Result<DecodeResult, LdpcError> {
-        let bits = self.codeword_len();
+        input: DecodeInput<'a>,
+        observer: &mut dyn Observer<DecodeEvent>,
+    ) -> Result<LdpcDecodeOutcome, LdpcError> {
+        let bits = self.checks.cols();
         if input.llrs.len() != bits {
             return Err(LdpcError::LlrLengthMismatch {
                 expected: bits,
@@ -73,24 +89,26 @@ impl Decoder for ExternalDecoder {
             5,
         )?;
 
-        if let Some(observer) = observer {
-            observer.on_event(&DecodeEvent::Started {
-                unsatisfied_checks: result.initial_unsatisfied_checks(),
-            });
-            observer.on_event(&DecodeEvent::IterationFinished {
-                iteration: 1,
-                unsatisfied_checks: result.final_unsatisfied_checks(),
-                changed_bits: result.changed_bits(),
-            });
-            observer.on_event(&DecodeEvent::Finished {
-                iterations: result.iterations(),
-                status: result.status(),
-                unsatisfied_checks: result.final_unsatisfied_checks(),
-                changed_bits: result.changed_bits(),
-            });
-        }
+        observer.on_event(&DecodeEvent::Started {
+            unsatisfied_checks: result.initial_unsatisfied_checks(),
+        });
+        observer.on_event(&DecodeEvent::IterationFinished {
+            iteration: 1,
+            unsatisfied_checks: result.final_unsatisfied_checks(),
+            changed_bits: result.changed_bits(),
+        });
+        observer.on_event(&DecodeEvent::Finished {
+            iterations: result.iterations(),
+            status: result.status(),
+            unsatisfied_checks: result.final_unsatisfied_checks(),
+            changed_bits: result.changed_bits(),
+        });
 
-        Ok(result)
+        let checks = result.checks();
+        Ok(DecodeOutcome::Candidate(Candidate {
+            value: result,
+            checks,
+        }))
     }
 }
 
@@ -99,15 +117,17 @@ fn external_decoder_can_return_its_own_successful_result_and_events() {
     let mut decoder = ExternalDecoder { checks: checks() };
     let llrs = [-1.0, 1.0, 3.0];
     let mut events = Events::default();
-    let result = decoder
-        .decode(
-            DecodeInput {
-                llrs: &llrs,
-                erasures: &[],
-            },
-            Some(&mut events),
-        )
-        .expect("the external decoder builds a valid result from the input");
+    let result = decoded(
+        decoder
+            .decode(
+                DecodeInput {
+                    llrs: &llrs,
+                    erasures: &[],
+                },
+                &mut events,
+            )
+            .expect("the external decoder builds a valid result from the input"),
+    );
 
     assert_eq!(result.word(), [Bit::Zero, Bit::Zero, Bit::Zero]);
     assert_eq!(result.posterior_llrs(), [2.0, 0.0, -0.0]);
@@ -147,7 +167,7 @@ fn external_decoder_validates_input_length_before_sending_events() {
             llrs: &[1.0],
             erasures: &[],
         },
-        Some(&mut events),
+        &mut events,
     );
 
     assert_eq!(

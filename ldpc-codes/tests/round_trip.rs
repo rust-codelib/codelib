@@ -1,7 +1,18 @@
+use coding_core::{Decoder, Encoder, NoopObserver};
 use ldpc_codes::{
-    bits_to_vector, count_bit_errors, vector_to_bits, Bit, DecodeInput, DecodeStatus,
-    DecoderConfig, Encoder, LdpcConfigurator, ParityCheckMatrix,
+    bits_to_vector, count_bit_errors, vector_to_bits, Bit, DecodeChecks, DecodeInput, DecodeResult,
+    DecodeStatus, DecoderConfig, LdpcConfigurator, LdpcDecodeOutcome, ParityCheckMatrix,
 };
+
+fn decoded(outcome: LdpcDecodeOutcome) -> DecodeResult {
+    let candidate: coding_core::Candidate<DecodeResult, DecodeChecks> = match outcome {
+        coding_core::DecodeOutcome::Candidate(candidate) => candidate,
+        coding_core::DecodeOutcome::NeedMore(reason) => match reason {},
+        coding_core::DecodeOutcome::Stopped(reason) => match reason {},
+    };
+    assert_eq!(candidate.checks, candidate.value.checks());
+    candidate.value
+}
 
 fn main_checks() -> ParityCheckMatrix {
     ParityCheckMatrix::try_from_rows(
@@ -33,9 +44,9 @@ fn noiseless_round_trip_preserves_zero_and_trailing_zero_messages() {
         assert_eq!(message_bits, message);
 
         let codeword = configured
-            .encoder()
-            .encode(&message_bits)
-            .expect("message has length k");
+            .encode(&message_bits, &mut NoopObserver)
+            .expect("message has length k")
+            .0;
         let llrs: Vec<_> = codeword
             .iter()
             .map(|bit| match bit {
@@ -43,15 +54,17 @@ fn noiseless_round_trip_preserves_zero_and_trailing_zero_messages() {
                 Bit::One => -3.0,
             })
             .collect();
-        let result = configured
-            .decode(
-                DecodeInput {
-                    llrs: &llrs,
-                    erasures: &[],
-                },
-                None,
-            )
-            .expect("the LLR block has the expected length");
+        let result = decoded(
+            configured
+                .decode(
+                    DecodeInput {
+                        llrs: &llrs,
+                        erasures: &[],
+                    },
+                    &mut NoopObserver,
+                )
+                .expect("the LLR block has the expected length"),
+        );
 
         assert_eq!(result.status(), DecodeStatus::ParitySatisfied);
         assert_eq!(result.iterations(), 0);
@@ -82,21 +95,23 @@ fn spa_corrects_the_planned_channel_values_and_round_trips_the_message() {
     )
     .expect("the repetition code has a valid encoder rank");
     let codeword = configured
-        .encoder()
-        .encode(&message)
-        .expect("message has length k");
+        .encode(&message, &mut NoopObserver)
+        .expect("message has length k")
+        .0;
     assert_eq!(codeword, [Bit::One, Bit::One, Bit::One]);
 
     let llrs = [-2.0, 1.0, -3.0];
-    let result = configured
-        .decode(
-            DecodeInput {
-                llrs: &llrs,
-                erasures: &[],
-            },
-            None,
-        )
-        .expect("the LLR block has the expected length");
+    let result = decoded(
+        configured
+            .decode(
+                DecodeInput {
+                    llrs: &llrs,
+                    erasures: &[],
+                },
+                &mut NoopObserver,
+            )
+            .expect("the LLR block has the expected length"),
+    );
 
     assert_eq!(result.status(), DecodeStatus::ParitySatisfied);
     assert_eq!(result.iterations(), 1);
@@ -121,19 +136,21 @@ fn exhausted_iteration_budget_reports_status_without_extracting_message() {
     )
     .expect("the repetition code has a valid encoder rank");
     let expected_codeword = configured
-        .encoder()
-        .encode(&[Bit::One])
-        .expect("message has length k");
+        .encode(&[Bit::One], &mut NoopObserver)
+        .expect("message has length k")
+        .0;
     let llrs = [-2.0, 1.0, -3.0];
-    let result = configured
-        .decode(
-            DecodeInput {
-                llrs: &llrs,
-                erasures: &[],
-            },
-            None,
-        )
-        .expect("the LLR block is valid even if it cannot be decoded yet");
+    let result = decoded(
+        configured
+            .decode(
+                DecodeInput {
+                    llrs: &llrs,
+                    erasures: &[],
+                },
+                &mut NoopObserver,
+            )
+            .expect("the LLR block is valid even if it cannot be decoded yet"),
+    );
 
     assert_eq!(result.status(), DecodeStatus::IterationLimit);
     assert_eq!(result.iterations(), 0);

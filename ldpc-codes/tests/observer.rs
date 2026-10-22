@@ -1,12 +1,13 @@
+use coding_core::{Decoder, NoopObserver, Observer};
 use ldpc_codes::{
-    Bit, DecodeEvent, DecodeInput, DecodeObserver, DecodeStatus, Decoder, DecoderConfig, LdpcError,
-    ParityCheckMatrix, SpaDecoder,
+    Bit, DecodeChecks, DecodeEvent, DecodeInput, DecodeResult, DecodeStatus, DecoderConfig,
+    LdpcDecodeOutcome, LdpcError, ParityCheckMatrix, SpaDecoder,
 };
 
 #[derive(Default)]
 struct Events(Vec<DecodeEvent>);
 
-impl DecodeObserver for Events {
+impl Observer<DecodeEvent> for Events {
     fn on_event(&mut self, event: &DecodeEvent) {
         self.0.push(*event);
     }
@@ -15,6 +16,16 @@ impl DecodeObserver for Events {
 fn checks() -> ParityCheckMatrix {
     ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1], vec![1, 2]])
         .expect("the hand-calculated matrix is valid")
+}
+
+fn decoded(outcome: LdpcDecodeOutcome) -> DecodeResult {
+    let candidate: coding_core::Candidate<DecodeResult, DecodeChecks> = match outcome {
+        coding_core::DecodeOutcome::Candidate(candidate) => candidate,
+        coding_core::DecodeOutcome::NeedMore(reason) => match reason {},
+        coding_core::DecodeOutcome::Stopped(reason) => match reason {},
+    };
+    assert_eq!(candidate.checks, candidate.value.checks());
+    candidate.value
 }
 
 #[test]
@@ -87,15 +98,17 @@ fn event_order_and_contents_match_zero_one_and_two_iteration_results() {
         let llrs = [2.0, -3.0, 4.0];
         let mut events = Events::default();
 
-        let result = decoder
-            .decode(
-                DecodeInput {
-                    llrs: &llrs,
-                    erasures: &[],
-                },
-                Some(&mut events),
-            )
-            .expect("valid input");
+        let result = decoded(
+            decoder
+                .decode(
+                    DecodeInput {
+                        llrs: &llrs,
+                        erasures: &[],
+                    },
+                    &mut events,
+                )
+                .expect("valid input"),
+        );
 
         assert_eq!(result.posterior_llrs(), expected_posterior);
         assert_eq!(result.word(), expected_word);
@@ -123,15 +136,17 @@ fn event_order_and_contents_match_zero_one_and_two_iteration_results() {
 
         let mut decoder_without_observer =
             SpaDecoder::try_new(checks(), config).expect("valid matrix");
-        let result_without_observer = decoder_without_observer
-            .decode(
-                DecodeInput {
-                    llrs: &llrs,
-                    erasures: &[],
-                },
-                None,
-            )
-            .expect("valid input");
+        let result_without_observer = decoded(
+            decoder_without_observer
+                .decode(
+                    DecodeInput {
+                        llrs: &llrs,
+                        erasures: &[],
+                    },
+                    &mut NoopObserver,
+                )
+                .expect("valid input"),
+        );
         assert_eq!(result, result_without_observer);
     }
 }
@@ -143,15 +158,17 @@ fn an_initially_satisfied_word_emits_started_then_finished_without_iterations() 
     let llrs = [2.0, 3.0, 4.0];
     let mut events = Events::default();
 
-    let result = decoder
-        .decode(
-            DecodeInput {
-                llrs: &llrs,
-                erasures: &[],
-            },
-            Some(&mut events),
-        )
-        .expect("valid input");
+    let result = decoded(
+        decoder
+            .decode(
+                DecodeInput {
+                    llrs: &llrs,
+                    erasures: &[],
+                },
+                &mut events,
+            )
+            .expect("valid input"),
+    );
 
     assert_eq!(result.status(), DecodeStatus::ParitySatisfied);
     assert_eq!(result.iterations(), 0);
@@ -187,7 +204,7 @@ fn invalid_input_emits_no_events() {
                 llrs: &short_llrs,
                 erasures: &[],
             },
-            Some(&mut events),
+            &mut events,
         ),
         Err(LdpcError::LlrLengthMismatch {
             expected: 3,
@@ -203,7 +220,7 @@ fn invalid_input_emits_no_events() {
                 llrs: &non_finite_llrs,
                 erasures: &[],
             },
-            Some(&mut events),
+            &mut events,
         ),
         Err(LdpcError::NonFiniteLlr { index: 1 })
     );
@@ -216,7 +233,7 @@ fn invalid_input_emits_no_events() {
                 llrs: &llrs,
                 erasures: &[3],
             },
-            Some(&mut events),
+            &mut events,
         ),
         Err(LdpcError::ErasureIndexOutOfBounds { bit: 3, bits: 3 })
     );
@@ -228,7 +245,7 @@ fn invalid_input_emits_no_events() {
                 llrs: &llrs,
                 erasures: &[1, 1],
             },
-            Some(&mut events),
+            &mut events,
         ),
         Err(LdpcError::DuplicateErasureIndex { bit: 1 })
     );

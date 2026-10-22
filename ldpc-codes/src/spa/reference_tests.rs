@@ -1,3 +1,5 @@
+use coding_core::{DecodeOutcome, Decoder as _, NoopObserver};
+
 use super::*;
 use crate::{Bit, DecodeInput, DecodeStatus, DecoderConfig, LdpcError, ParityCheckMatrix};
 use proptest::prelude::*;
@@ -376,9 +378,14 @@ fn independent_dense_syndrome_cycle_runs_both_general_plan_examples() {
 
         let mut decoder = SpaDecoder::try_new(sparse_checks_from_dense(&dense_h), config)
             .expect("the general-plan matrix is valid for SPA");
-        let result = decoder
-            .decode(input, None)
+        let outcome = decoder
+            .decode(input, &mut NoopObserver)
             .expect("the general-plan LLR block is valid");
+        let result = match outcome {
+            DecodeOutcome::Candidate(candidate) => candidate.value,
+            DecodeOutcome::NeedMore(reason) => match reason {},
+            DecodeOutcome::Stopped(reason) => match reason {},
+        };
         assert_eq!(result.word(), reference_result.word);
         assert_float_slices_close(
             &reference_result.posterior,

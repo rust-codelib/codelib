@@ -1,4 +1,5 @@
-use ldpc_codes::{Bit, Encoder, LdpcError, ParityCheckMatrix, SystematicEncoder};
+use coding_core::{Encoder, NoopObserver};
+use ldpc_codes::{Bit, LdpcError, ParityCheckMatrix, SystematicEncoder};
 
 const MAIN_DENSE_H: [[u8; 6]; 4] = [
     [1, 1, 0, 1, 0, 0],
@@ -35,7 +36,7 @@ fn dense_syndrome<const N: usize>(checks: &[[u8; N]], word: &[Bit]) -> Vec<u8> {
 }
 
 fn assert_all_messages_match_dense_checks<const N: usize>(
-    encoder: &SystematicEncoder,
+    encoder: &mut SystematicEncoder,
     checks: &[[u8; N]],
 ) {
     for value in 0..(1 << encoder.message_len()) {
@@ -43,7 +44,10 @@ fn assert_all_messages_match_dense_checks<const N: usize>(
             .map(|index| Bit::try_from(((value >> index) & 1) as u8).unwrap())
             .collect();
         let original_message = message.clone();
-        let word = encoder.encode(&message).unwrap();
+        let word = encoder
+            .encode(message.as_slice(), &mut NoopObserver)
+            .unwrap()
+            .0;
 
         assert_eq!(word.len(), encoder.codeword_len());
         assert_eq!(dense_syndrome(checks, &word), vec![0; checks.len()]);
@@ -164,7 +168,7 @@ fn preparation_is_deterministic() {
 
 #[test]
 fn encodes_the_main_example_exactly_and_all_messages_satisfy_independent_checks() {
-    let encoder = encoder(
+    let mut encoder = encoder(
         6,
         vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5], vec![2, 3, 5]],
     );
@@ -173,51 +177,63 @@ fn encodes_the_main_example_exactly_and_all_messages_satisfy_independent_checks(
     assert_eq!(encoder.codeword_len(), 6);
     assert_eq!(encoder.information_positions(), &[3, 4, 5]);
     assert_eq!(
-        encoder.encode(&bits(&[0, 1, 1])).unwrap(),
+        encoder
+            .encode(&bits(&[0, 1, 1]), &mut NoopObserver)
+            .unwrap()
+            .0,
         bits(&[0, 0, 1, 0, 1, 1])
     );
-    assert_all_messages_match_dense_checks(&encoder, &MAIN_DENSE_H);
+    assert_all_messages_match_dense_checks(&mut encoder, &MAIN_DENSE_H);
 }
 
 #[test]
 fn encodes_the_cycle_example_exactly_and_all_messages_satisfy_independent_checks() {
-    let encoder = encoder(5, vec![vec![0, 1, 4], vec![2, 3, 4]]);
+    let mut encoder = encoder(5, vec![vec![0, 1, 4], vec![2, 3, 4]]);
 
     assert_eq!(encoder.information_positions(), &[1, 3, 4]);
     assert_eq!(
-        encoder.encode(&bits(&[1, 0, 1])).unwrap(),
+        encoder
+            .encode(&bits(&[1, 0, 1]), &mut NoopObserver)
+            .unwrap()
+            .0,
         bits(&[0, 1, 1, 0, 1])
     );
-    assert_all_messages_match_dense_checks(&encoder, &CYCLE_DENSE_H);
+    assert_all_messages_match_dense_checks(&mut encoder, &CYCLE_DENSE_H);
 }
 
 #[test]
 fn preserves_trailing_zeros_and_encodes_the_zero_message() {
-    let encoder = encoder(
+    let mut encoder = encoder(
         6,
         vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5], vec![2, 3, 5]],
     );
     let trailing_zeros = bits(&[1, 0, 0]);
 
     assert_eq!(
-        encoder.encode(&trailing_zeros).unwrap(),
+        encoder
+            .encode(&trailing_zeros, &mut NoopObserver)
+            .unwrap()
+            .0,
         bits(&[0, 1, 1, 1, 0, 0])
     );
     assert_eq!(trailing_zeros, bits(&[1, 0, 0]));
     assert_eq!(
-        encoder.encode(&bits(&[0, 0, 0])).unwrap(),
+        encoder
+            .encode(&bits(&[0, 0, 0]), &mut NoopObserver)
+            .unwrap()
+            .0,
         vec![Bit::Zero; 6]
     );
 }
 
 #[test]
 fn reports_message_length_errors_for_empty_short_and_long_inputs() {
-    let encoder = encoder(6, vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5]]);
+    let mut encoder = encoder(6, vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5]]);
 
     for message in [vec![], bits(&[1, 0]), bits(&[1, 0, 1, 1])] {
         let original = message.clone();
         assert_eq!(
-            encoder.encode(&message),
+            encoder.encode(&message, &mut NoopObserver),
             Err(LdpcError::MessageLengthMismatch {
                 expected: 3,
                 actual: message.len(),
@@ -271,11 +287,14 @@ fn extract_checks_word_length_before_computing_syndrome() {
 
 #[test]
 fn accepts_a_different_valid_codeword_and_rejects_a_foreign_codeword() {
-    let encoder = encoder(
+    let mut encoder = encoder(
         6,
         vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5], vec![2, 3, 5]],
     );
-    let other_valid_word = encoder.encode(&bits(&[1, 0, 0])).unwrap();
+    let other_valid_word = encoder
+        .encode(&bits(&[1, 0, 0]), &mut NoopObserver)
+        .unwrap()
+        .0;
     assert_eq!(
         encoder.extract_message(&other_valid_word).unwrap(),
         bits(&[1, 0, 0])
@@ -294,7 +313,7 @@ fn accepts_a_different_valid_codeword_and_rejects_a_foreign_codeword() {
 
 #[test]
 fn repeated_calls_are_independent_and_preserve_each_input() {
-    let encoder = encoder(5, vec![vec![0, 1, 4], vec![2, 3, 4]]);
+    let mut encoder = encoder(5, vec![vec![0, 1, 4], vec![2, 3, 4]]);
     let first = bits(&[1, 0, 1]);
     let second = bits(&[0, 1, 0]);
     let first_before = first.clone();
@@ -304,9 +323,18 @@ fn repeated_calls_are_independent_and_preserve_each_input() {
     let expected_first_before = expected_first.clone();
     let expected_second_before = expected_second.clone();
 
-    assert_eq!(encoder.encode(&first).unwrap(), expected_first);
-    assert_eq!(encoder.encode(&second).unwrap(), expected_second);
-    assert_eq!(encoder.encode(&first).unwrap(), expected_first);
+    assert_eq!(
+        encoder.encode(&first, &mut NoopObserver).unwrap().0,
+        expected_first
+    );
+    assert_eq!(
+        encoder.encode(&second, &mut NoopObserver).unwrap().0,
+        expected_second
+    );
+    assert_eq!(
+        encoder.encode(&first, &mut NoopObserver).unwrap().0,
+        expected_first
+    );
     assert_eq!(encoder.extract_message(&expected_first).unwrap(), first);
     assert_eq!(encoder.extract_message(&expected_second).unwrap(), second);
     assert_eq!(first, first_before);

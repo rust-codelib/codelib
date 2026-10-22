@@ -6,12 +6,14 @@
 mod graph;
 mod state;
 
+use coding_core::{Candidate, DecodeOutcome, Observer};
+
 use crate::bit::{bit_distance, count_ones};
 #[cfg(test)]
 use crate::decode_input::prepared_channel;
 use crate::{
-    Bit, DecodeEvent, DecodeInput, DecodeObserver, DecodeResult, DecodeStatus, Decoder,
-    DecoderConfig, LdpcError, ParityCheckMatrix,
+    Bit, DecodeChecks, DecodeEvent, DecodeInput, DecodeResult, DecodeStatus, DecoderConfig,
+    LdpcDecodeOutcome, LdpcError, ParityCheckMatrix,
 };
 #[cfg(test)]
 use state::float_bits;
@@ -76,30 +78,55 @@ impl SpaDecoder {
         let state = SpaState::try_new(checks)?;
         Ok(Self { state, config })
     }
-}
 
-impl Decoder for SpaDecoder {
-    fn codeword_len(&self) -> usize {
+    /// Возвращает число LLR, ожидаемое для одного входного блока.
+    #[must_use]
+    pub fn codeword_len(&self) -> usize {
         self.state.graph.bit_edges.len()
     }
+}
+
+/// Декодирует один блок и синхронно передаёт события общему наблюдателю.
+///
+/// Перед жёстким решением конечные LLR насыщаются пределом конфигурации,
+/// а стёртые позиции заменяются нулём. Решение равно [`Bit::Zero`] при LLR
+/// `>= 0.0` (включая `+0.0` и `-0.0`) и [`Bit::One`] при отрицательном LLR.
+/// Входной срез `DecodeInput` берётся по значению и не сохраняется после
+/// вызова; [`DecodeResult`] и его массивы принадлежат кандидату.
+///
+/// Для корректного входа события идут в порядке `Started`, по одному
+/// `IterationFinished` на полностью завершённую итерацию, затем `Finished`.
+/// При ошибке входа событий нет. Проверки выполняются в порядке: длина LLR,
+/// конечность значений, границы индексов стираний, повторы индексов.
+/// Исчерпание бюджета итераций является обычным [`DecodeStatus`] в результате:
+/// при `IterationLimit`, включая бюджет `0`, возвращается
+/// [`DecodeOutcome::Candidate`] с сохранёнными словом, LLR и синдромом, а не
+/// ошибка или [`DecodeOutcome::Stopped`].
+///
+/// Декодер обрабатывает каждый блок независимо и не накапливает канальные
+/// данные между вызовами. Ранее возвращённые результаты не изменяются.
+impl<'a> coding_core::Decoder<DecodeInput<'a>> for SpaDecoder {
+    type Value = DecodeResult;
+    type Checks = DecodeChecks;
+    type NeedMore = core::convert::Infallible;
+    type StopReason = core::convert::Infallible;
+    type Error = LdpcError;
+    type Event = DecodeEvent;
 
     fn decode(
         &mut self,
-        input: DecodeInput<'_>,
-        observer: Option<&mut dyn DecodeObserver>,
-    ) -> Result<DecodeResult, LdpcError> {
+        input: DecodeInput<'a>,
+        observer: &mut dyn Observer<DecodeEvent>,
+    ) -> Result<LdpcDecodeOutcome, LdpcError> {
         self.state.prepare_block(input, self.config)?;
 
-        let mut observer = observer;
         let mut syndrome = vec![Bit::Zero; self.state.graph.check_edges.len()];
         self.state.fill_syndrome(&mut syndrome);
         let initial_unsatisfied_checks = count_ones(&syndrome);
         let initial_word = self.state.word.clone();
-        if let Some(observer) = observer.as_deref_mut() {
-            observer.on_event(&DecodeEvent::Started {
-                unsatisfied_checks: initial_unsatisfied_checks,
-            });
-        }
+        observer.on_event(&DecodeEvent::Started {
+            unsatisfied_checks: initial_unsatisfied_checks,
+        });
 
         let mut iterations = 0;
         let mut status = (initial_unsatisfied_checks == 0).then_some(DecodeStatus::ParitySatisfied);
@@ -110,14 +137,12 @@ impl Decoder for SpaDecoder {
             self.state.fill_syndrome(&mut syndrome);
 
             let unsatisfied_checks = count_ones(&syndrome);
-            if let Some(observer) = observer.as_deref_mut() {
-                let changed_bits = bit_distance(&initial_word, &self.state.word);
-                observer.on_event(&DecodeEvent::IterationFinished {
-                    iteration: iterations,
-                    unsatisfied_checks,
-                    changed_bits,
-                });
-            }
+            let changed_bits = bit_distance(&initial_word, &self.state.word);
+            observer.on_event(&DecodeEvent::IterationFinished {
+                iteration: iterations,
+                unsatisfied_checks,
+                changed_bits,
+            });
 
             if unsatisfied_checks == 0 {
                 status = Some(DecodeStatus::ParitySatisfied);
@@ -127,16 +152,14 @@ impl Decoder for SpaDecoder {
         let status = status.unwrap_or(DecodeStatus::IterationLimit);
         let final_unsatisfied_checks = count_ones(&syndrome);
         let changed_bits = bit_distance(&initial_word, &self.state.word);
-        if let Some(observer) = observer {
-            observer.on_event(&DecodeEvent::Finished {
-                iterations,
-                status,
-                unsatisfied_checks: final_unsatisfied_checks,
-                changed_bits,
-            });
-        }
+        observer.on_event(&DecodeEvent::Finished {
+            iterations,
+            status,
+            unsatisfied_checks: final_unsatisfied_checks,
+            changed_bits,
+        });
 
-        Ok(DecodeResult {
+        let result = DecodeResult {
             word: self.state.word.clone(),
             posterior_llrs: self.state.posterior.clone(),
             syndrome,
@@ -145,7 +168,13 @@ impl Decoder for SpaDecoder {
             changed_bits,
             initial_unsatisfied_checks,
             final_unsatisfied_checks,
-        })
+        };
+        let checks = result.checks();
+
+        Ok(DecodeOutcome::Candidate(Candidate {
+            value: result,
+            checks,
+        }))
     }
 }
 

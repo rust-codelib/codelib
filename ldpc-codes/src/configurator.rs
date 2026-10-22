@@ -1,8 +1,10 @@
 //! Сборка согласованных кодера и декодера по одной проверочной матрице.
 
+use coding_core::{Codeword, Observer};
+
 use crate::{
-    DecodeInput, DecodeObserver, DecodeResult, Decoder, DecoderConfig, LdpcError,
-    ParityCheckMatrix, SpaDecoder, SystematicEncoder,
+    Bit, DecodeChecks, DecodeEvent, DecodeInput, DecodeResult, DecoderConfig, LdpcDecodeOutcome,
+    LdpcError, ParityCheckMatrix, SpaDecoder, SystematicEncoder,
 };
 
 /// Создаёт пару кодера и декодера, согласованную с одной матрицей `H`.
@@ -11,8 +13,13 @@ pub struct LdpcConfigurator;
 /// Согласованные кодер и декодер одного двоичного LDPC-кода.
 ///
 /// Поля закрыты: пара появляется только после успешной подготовки и кодера,
-/// и декодера по одной исходной проверочной матрице. Декодировать блок можно
-/// через [`Self::decode`]; внутренний декодер нельзя заменить отдельно.
+/// и декодера по одной исходной проверочной матрице. Пара реализует общие
+/// [`coding_core::Encoder<&[Bit]>`] и [`coding_core::Decoder<DecodeInput<'_>>`];
+/// внутренние компоненты нельзя заменить отдельно.
+///
+/// Кодирование выполняют через `self.encode(...)`, а не через неизменяемый
+/// [`Self::encoder`]: общему кодеру нужна изменяемая ссылка на пару. Метаданные
+/// и извлечение сообщения остаются доступны через [`Self::encoder`].
 ///
 /// Попытка получить изменяемую ссылку на внутренний декодер не компилируется:
 ///
@@ -61,25 +68,68 @@ impl LdpcConfigurator {
 
 impl ConfiguredLdpc {
     /// Возвращает согласованный систематический кодер.
+    ///
+    /// Ссылка неизменяемая: через неё доступны размеры, информационные позиции
+    /// и извлечение сообщения. Кодировать нужно саму пару через
+    /// [`coding_core::Encoder::encode`], иначе внутренний кодер нельзя было бы
+    /// изменяемо позаимствовать при сохранении закрытой пары.
     #[must_use]
     pub fn encoder(&self) -> &SystematicEncoder {
         &self.encoder
     }
 
-    /// Декодирует один блок с SPA-декодером, согласованным с кодером.
-    ///
-    /// Декодер остаётся связан с исходной проверочной матрицей пары и
-    /// повторно использует своё состояние между вызовами.
-    ///
-    /// # Ошибки
-    ///
-    /// Возвращает ошибки некорректного входа, определённые контрактом
-    /// [`Decoder::decode`].
-    pub fn decode(
+    /// Возвращает число информационных битов `k` согласованного кода.
+    #[must_use]
+    pub fn message_len(&self) -> usize {
+        self.encoder.message_len()
+    }
+
+    /// Возвращает число битов кодового слова `n` согласованного кода.
+    #[must_use]
+    pub fn codeword_len(&self) -> usize {
+        self.encoder.codeword_len()
+    }
+}
+
+/// Кодирует сообщение согласованным систематическим кодером.
+///
+/// Слово возвращается в порядке столбцов исходной `H`, информационные биты
+/// стоят в [`SystematicEncoder::information_positions`]. Событий нет, поэтому
+/// наблюдатель не вызывается.
+impl<'a> coding_core::Encoder<&'a [Bit]> for ConfiguredLdpc {
+    type Output = Codeword<Vec<Bit>>;
+    type Error = LdpcError;
+    type Event = ();
+
+    fn encode(
         &mut self,
-        input: DecodeInput<'_>,
-        observer: Option<&mut dyn DecodeObserver>,
-    ) -> Result<DecodeResult, LdpcError> {
+        message: &'a [Bit],
+        observer: &mut dyn Observer<()>,
+    ) -> Result<Self::Output, Self::Error> {
+        self.encoder.encode(message, observer)
+    }
+}
+
+/// Декодирует один блок SPA-декодером, согласованным с кодером.
+///
+/// Контракт совпадает с реализацией у [`SpaDecoder`]: кандидат возвращается и
+/// при исчерпании бюджета, включая бюджет `0`. Декодер остаётся связан с
+/// исходной проверочной матрицей пары и повторно использует своё состояние
+/// между вызовами. Ошибки входа не отправляют событий и не портят следующий
+/// корректный вызов.
+impl<'a> coding_core::Decoder<DecodeInput<'a>> for ConfiguredLdpc {
+    type Value = DecodeResult;
+    type Checks = DecodeChecks;
+    type NeedMore = core::convert::Infallible;
+    type StopReason = core::convert::Infallible;
+    type Error = LdpcError;
+    type Event = DecodeEvent;
+
+    fn decode(
+        &mut self,
+        input: DecodeInput<'a>,
+        observer: &mut dyn Observer<DecodeEvent>,
+    ) -> Result<LdpcDecodeOutcome, LdpcError> {
         self.decoder.decode(input, observer)
     }
 }
