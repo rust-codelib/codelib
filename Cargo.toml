@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["coding-core", "gf2m", "gfpm", "rs-codes", "gf-linalg", "ldpc-codes"]
+members = ["coding-core", "gf2m", "gfpm", "rs-codes", "gf-linalg", "ldpc-codes", "bch-codes"]
 
 [workspace.package]
 edition = "2021"
