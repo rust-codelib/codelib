@@ -8,5 +8,6 @@ pub fn correct_bch7(config: &BchConfig, generator: &[u8], received: &mut [u8]) -
         field: &mut field,
         positions: &mut positions,
     };
-    correct::<8, 0xB>(config, generator, received, &mut workspace).unwrap()
+    // GF(8): x^3 + x + 1.
+    correct::<8, 0b1_011>(config, generator, received, &mut workspace).unwrap()
 }

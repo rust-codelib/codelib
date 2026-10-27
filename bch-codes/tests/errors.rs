@@ -11,9 +11,10 @@ use gf2m::Gf8;
 fn rejects_wrong_buffer_lengths_and_nonzero_padding() {
     let config = BchConfig::new(1, 0).unwrap();
     let generator = bch7_generator(&config);
-    assert!(encode_systematic::<8, 0xB>(&config, &generator, &[], &mut [0u8; 1]).is_err());
-    assert!(encode_systematic::<8, 0xB>(&config, &generator, &[0u8; 1], &mut []).is_err());
-    assert!(encode_systematic::<8, 0xB>(&config, &generator, &[0x10], &mut [0u8; 1]).is_err());
+    // GF(8): x^3 + x + 1.
+    assert!(encode_systematic::<8, 0b1_011>(&config, &generator, &[], &mut [0u8; 1]).is_err());
+    assert!(encode_systematic::<8, 0b1_011>(&config, &generator, &[0u8; 1], &mut []).is_err());
+    assert!(encode_systematic::<8, 0b1_011>(&config, &generator, &[0x10], &mut [0u8; 1]).is_err());
 
     let mut padded_word = [0x80];
     let before = padded_word;
@@ -23,13 +24,15 @@ fn rejects_wrong_buffer_lengths_and_nonzero_padding() {
         field: &mut field,
         positions: &mut positions,
     };
-    assert!(correct::<8, 0xB>(&config, &generator, &mut padded_word, &mut workspace).is_err());
+    // GF(8): x^3 + x + 1.
+    assert!(correct::<8, 0b1_011>(&config, &generator, &mut padded_word, &mut workspace).is_err());
     assert_eq!(padded_word, before);
 
     let mut short_generator = [];
     let mut construction_workspace = [Gf8::zero(); 32];
     assert!(
-        build_generator::<8, 0xB>(&config, &mut short_generator, &mut construction_workspace)
+        // GF(8): x^3 + x + 1.
+        build_generator::<8, 0b1_011>(&config, &mut short_generator, &mut construction_workspace)
             .is_err()
     );
 }
@@ -46,6 +49,7 @@ fn rejects_insufficient_decode_workspace_without_modifying_input() {
         field: &mut no_field,
         positions: &mut no_positions,
     };
-    assert!(correct::<8, 0xB>(&config, &generator, &mut received, &mut workspace).is_err());
+    // GF(8): x^3 + x + 1.
+    assert!(correct::<8, 0b1_011>(&config, &generator, &mut received, &mut workspace).is_err());
     assert_eq!(received, before);
 }

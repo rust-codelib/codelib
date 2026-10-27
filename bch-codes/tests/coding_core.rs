@@ -12,7 +12,8 @@ use gf2m::Gf8;
 fn coding_core_encoder_and_decoder_correct_in_place() {
     let config = BchConfig::new(1, 0).unwrap();
     let generator = bch7_generator(&config);
-    let mut codec = BchCodec::<8, 0xB>::new(config, &generator).unwrap();
+    // GF(8): x^3 + x + 1.
+    let mut codec = BchCodec::<8, 0b1_011>::new(config, &generator).unwrap();
     let mut encoded = [0u8; 1];
     let Codeword(word) = codec
         .encode(

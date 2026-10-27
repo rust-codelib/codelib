@@ -22,7 +22,8 @@ fn known_systematic_word_bch_7_4_3() {
     let generator = bch7_generator(&config);
     let mut encoded = [0u8; 1];
     // m(x) = 1, x^3 m(x) mod g(x) = x + 1.
-    encode_systematic::<8, 0xB>(&config, &generator, &[0x01], &mut encoded).unwrap();
+    // GF(8): x^3 + x + 1.
+    encode_systematic::<8, 0b1_011>(&config, &generator, &[0x01], &mut encoded).unwrap();
     assert_eq!(encoded, [0b0000_1011]);
 }
 
@@ -31,7 +32,8 @@ fn valid_word_is_returned_without_correction() {
     let config = BchConfig::new(1, 0).unwrap();
     let generator = bch7_generator(&config);
     let mut word = [0u8; 1];
-    encode_systematic::<8, 0xB>(&config, &generator, &[0b0110], &mut word).unwrap();
+    // GF(8): x^3 + x + 1.
+    encode_systematic::<8, 0b1_011>(&config, &generator, &[0b0110], &mut word).unwrap();
     let before = word;
     let BchCorrection::Candidate(checks) = correct_bch7(&config, &generator, &mut word) else {
         panic!("valid codeword must be a candidate");
@@ -48,7 +50,8 @@ fn bch_7_4_3_exhaustive_single_error_round_trip() {
     let generator = bch7_generator(&config);
     for message in 0u8..16 {
         let mut encoded = [0u8; 1];
-        encode_systematic::<8, 0xB>(&config, &generator, &[message], &mut encoded).unwrap();
+        // GF(8): x^3 + x + 1.
+        encode_systematic::<8, 0b1_011>(&config, &generator, &[message], &mut encoded).unwrap();
         assert_eq!(encoded[0] >> 3, message, "message = {message:#x}");
         assert_eq!(encoded[0] & 0x80, 0, "message = {message:#x}");
         for error_position in 0..7 {
@@ -74,7 +77,8 @@ fn chien_search_uses_inverse_root_to_position_mapping() {
     let config = BchConfig::new(1, 0).unwrap();
     let generator = bch7_generator(&config);
     let mut encoded = [0u8; 1];
-    encode_systematic::<8, 0xB>(&config, &generator, &[0b1010], &mut encoded).unwrap();
+    // GF(8): x^3 + x + 1.
+    encode_systematic::<8, 0b1_011>(&config, &generator, &[0b1010], &mut encoded).unwrap();
     for position in 0..7 {
         let mut received = encoded;
         received[0] ^= 1 << position;
@@ -95,7 +99,8 @@ fn bch_15_7_5_corrects_representative_double_errors() {
     let generator = bch15_generator(&config);
     for message in [0x00, 0x01, 0x35, 0x55, 0x7f] {
         let mut encoded = [0u8; 2];
-        encode_systematic::<16, 0x13>(&config, &generator, &[message], &mut encoded).unwrap();
+        // GF(16): x^4 + x + 1.
+        encode_systematic::<16, 0b1_0011>(&config, &generator, &[message], &mut encoded).unwrap();
         for (left, right) in [(0, 1), (0, 14), (3, 11), (7, 8), (12, 14)] {
             let mut received = encoded;
             received[left / 8] ^= 1 << (left % 8);
@@ -107,7 +112,9 @@ fn bch_15_7_5_corrects_representative_double_errors() {
                 positions: &mut positions,
             };
             assert!(matches!(
-                correct::<16, 0x13>(&config, &generator, &mut received, &mut workspace).unwrap(),
+                // GF(16): x^4 + x + 1.
+                correct::<16, 0b1_0011>(&config, &generator, &mut received, &mut workspace)
+                    .unwrap(),
                 BchCorrection::Candidate(_)
             ));
             assert_eq!(

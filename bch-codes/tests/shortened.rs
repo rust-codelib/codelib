@@ -16,7 +16,8 @@ fn shortened_bch_7_has_three_message_bits_and_corrects_transmitted_positions() {
     let generator = bch7_generator(&config);
     for message in 0u8..8 {
         let mut encoded = [0u8; 1];
-        encode_systematic::<8, 0xB>(&config, &generator, &[message], &mut encoded).unwrap();
+        // GF(8): x^3 + x + 1.
+        encode_systematic::<8, 0b1_011>(&config, &generator, &[message], &mut encoded).unwrap();
         assert_eq!(encoded[0] & 0b1100_0000, 0);
         for position in 0..6 {
             let mut received = encoded;
