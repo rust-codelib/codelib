@@ -1,0 +1,25 @@
+[package]
+name = "bch-codes"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Двоичные примитивные узкосмысловые BCH-коды"
+keywords = ["bch", "error-correction", "fec", "galois", "no_std"]
+categories = ["encoding", "no-std", "algorithms", "mathematics"]
+
+[features]
+default = ["alloc"]
+alloc = []
+
+[dependencies]
+coding-core = { path = "../coding-core", version = "0.1.0" }
+gf2m = { path = "../gf2m", version = "1.0.0" }
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lib]
+name = "bch_codes"
+path = "src/lib.rs"
