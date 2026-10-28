@@ -5,9 +5,13 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Двоичные примитивные узкосмысловые BCH-коды без аллокаций"
+description = "Двоичные примитивные узкосмысловые BCH-коды"
 keywords = ["bch", "error-correction", "fec", "galois", "no_std"]
 categories = ["encoding", "no-std", "algorithms", "mathematics"]
+
+[features]
+default = ["alloc"]
+alloc = []
 
 [dependencies]
 coding-core = { path = "../coding-core", version = "0.1.0" }

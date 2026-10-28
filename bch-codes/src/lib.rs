@@ -15,6 +15,9 @@
 //! принятого. При фактическом числе ошибок больше `t` другое кодовое слово
 //! может быть принято за исходное — это ограничение теории BCH.
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 mod berlekamp_massey;
 mod bits;
 mod chien;
@@ -24,6 +27,8 @@ mod decode;
 mod encode;
 mod error;
 mod generator;
+#[cfg(feature = "alloc")]
+mod owned;
 mod syndrome;
 
 pub use codec::{BchCodec, BchDecodeInput, BchEncodeInput};
@@ -36,3 +41,5 @@ pub use encode::{encode_systematic, extract_message};
 pub use error::{BchChecks, BchCorrection, BchError, BchEvent, BchStopReason};
 pub use generator::build_generator;
 pub use gf2m::Gf;
+#[cfg(feature = "alloc")]
+pub use owned::{OwnedBchCodec, OwnedBchDecodeInput, OwnedBchDecodeOutcome};
