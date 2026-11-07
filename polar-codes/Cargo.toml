@@ -1,0 +1,12 @@
+[package]
+name = "polar-codes"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Двоичные полярные коды: преобразование Арикана и декодирование последовательным исключением"
+
+[lib]
+name = "polar_codes"
+path = "src/lib.rs"

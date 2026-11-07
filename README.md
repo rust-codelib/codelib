@@ -18,6 +18,15 @@ cargo run -p ldpc-codes --example decode_with_log
 cargo run -p ldpc-codes --example decode_round_trip
 ```
 
+## Полярные коды
+
+Крейт [`polar-codes`](polar-codes/README.md) строит двоичный полярный код длины `N = 2^m` (до 4096), кодирует сообщение ядром Арикана и декодирует его последовательным исключением. Информационные позиции можно задать явно или выбрать по параметрам Бхаттачарии для двоичного стирающего канала. [Руководство крейта](polar-codes/README.md) содержит быстрый старт и пример API.
+
+```sh
+cargo run -p polar-codes --example round_trip
+cargo run -p polar-codes --example recover
+```
+
 ## Согласованные ограничения размеров
 
 | Объект | Ограничение |
