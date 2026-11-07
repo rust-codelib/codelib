@@ -160,3 +160,27 @@ fn combine_g(left: f64, right: f64, bit: Bit) -> f64 {
         clamp_llr(value)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{combine_f, Combine};
+
+    #[test]
+    fn exact_boxplus_matches_the_closed_form_for_equal_magnitudes() {
+        let expected = 10.0 - 2.0_f64.ln();
+        let same = combine_f(10.0, 10.0, Combine::Exact);
+        let opposite = combine_f(10.0, -10.0, Combine::Exact);
+        assert!((same - expected).abs() < 1.0e-8);
+        assert!((opposite + expected).abs() < 1.0e-8);
+        assert_eq!(combine_f(0.0, 5.0, Combine::Exact), 0.0);
+        assert!((combine_f(40.0, 40.0, Combine::Exact) - (40.0 - 2.0_f64.ln())).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn min_sum_keeps_the_sign_product_and_the_smaller_magnitude() {
+        assert_eq!(combine_f(10.0, -4.0, Combine::MinSum), -4.0);
+        assert_eq!(combine_f(-3.0, -8.0, Combine::MinSum), 3.0);
+        assert_eq!(combine_f(0.0, -8.0, Combine::MinSum), 0.0);
+        assert_eq!(combine_f(-0.0, 2.0, Combine::MinSum), 0.0);
+    }
+}
