@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
-
-//! Двоичные полярные коды: преобразование Арикана и выбор информационных позиций.
+#![doc = include_str!("../README.md")]
 
 mod bit;
 mod code;
