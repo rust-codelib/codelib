@@ -1,5 +1,6 @@
 //! Двоичный полярный код заданной длины и множества информационных позиций.
 
+use crate::decoder::{successive_cancellation, Combine, ScDecision};
 use crate::length::check_length;
 use crate::transform::transform_in_place;
 use crate::{Bit, PolarError};
@@ -132,5 +133,19 @@ impl PolarCode {
             .iter()
             .map(|&index| source[index])
             .collect())
+    }
+
+    /// Оценивает переданное слово по канальным LLR последовательным исключением.
+    ///
+    /// Положительный LLR, включая оба знаковых нуля, означает [`Bit::Zero`],
+    /// отрицательный — [`Bit::One`]. Абсолютные значения насыщаются на `10^6`.
+    /// Замороженные биты принудительно равны нулю, поэтому оценка всегда лежит в коде.
+    ///
+    /// # Errors
+    ///
+    /// Возвращает [`PolarError::LlrLengthMismatch`], если число LLR не равно `N`,
+    /// или [`PolarError::NonFiniteLlr`], если среди них есть NaN или бесконечность.
+    pub fn decode(&self, llrs: &[f64], rule: Combine) -> Result<ScDecision, PolarError> {
+        successive_cancellation(&self.frozen, &self.information, llrs, rule)
     }
 }
