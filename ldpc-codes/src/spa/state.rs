@@ -1,7 +1,7 @@
 use super::graph::{checked_workspace_sizes, SparseGraph};
 use super::SpaStepResult;
 use crate::bit::bit_parity;
-use crate::decode_input::prepare_channel;
+use crate::decode::{hard_decision, prepare_channel};
 use crate::{Bit, DecodeInput, DecoderConfig, LdpcError, ParityCheckMatrix};
 
 #[derive(Debug)]
@@ -157,28 +157,6 @@ impl SpaState {
             posterior_llrs: self.posterior,
         }
     }
-
-    #[cfg(test)]
-    pub(super) fn snapshot(&self) -> StateSnapshot {
-        StateSnapshot {
-            channel: float_bits(&self.channel),
-            q: float_bits(&self.q),
-            r: float_bits(&self.r),
-            posterior: float_bits(&self.posterior),
-            word: self.word.clone(),
-            tanh: float_bits(&self.tanh),
-            prefix: float_bits(&self.prefix),
-            suffix: float_bits(&self.suffix),
-        }
-    }
-}
-
-fn hard_decision(llr: f64) -> Bit {
-    if llr >= 0.0 {
-        Bit::Zero
-    } else {
-        Bit::One
-    }
 }
 
 pub(super) fn llr_from_product(product: f64, config: DecoderConfig) -> f64 {
@@ -189,23 +167,4 @@ pub(super) fn llr_from_product(product: f64, config: DecoderConfig) -> f64 {
     let product_limit = 1.0 - f64::EPSILON;
     let product = product.clamp(-product_limit, product_limit);
     (product.ln_1p() - (-product).ln_1p()).clamp(-config.llr_limit(), config.llr_limit())
-}
-
-#[cfg(test)]
-#[derive(Debug, PartialEq, Eq)]
-/// Snapshot of semantic state; the validation-only erasure mask is excluded.
-pub(super) struct StateSnapshot {
-    channel: Vec<u64>,
-    q: Vec<u64>,
-    r: Vec<u64>,
-    posterior: Vec<u64>,
-    word: Vec<Bit>,
-    tanh: Vec<u64>,
-    prefix: Vec<u64>,
-    suffix: Vec<u64>,
-}
-
-#[cfg(test)]
-pub(super) fn float_bits(values: &[f64]) -> Vec<u64> {
-    values.iter().map(|value| value.to_bits()).collect()
 }

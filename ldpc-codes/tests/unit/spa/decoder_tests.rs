@@ -1,10 +1,12 @@
+use coding_core::{Decoder as _, NoopObserver, Observer};
+
 use super::*;
-use crate::{DecodeEvent, DecodeInput, DecodeObserver, Decoder};
+use crate::{DecodeEvent, DecodeInput};
 
 #[derive(Default)]
 struct Events(Vec<DecodeEvent>);
 
-impl DecodeObserver for Events {
+impl Observer<DecodeEvent> for Events {
     fn on_event(&mut self, event: &DecodeEvent) {
         self.0.push(*event);
     }
@@ -24,7 +26,7 @@ fn invalid_decode_inputs_preserve_semantic_state_and_emit_no_events() {
                 llrs: &initial_llrs,
                 erasures: &initial_erasures,
             },
-            None,
+            &mut NoopObserver,
         )
         .expect("initial block is valid");
     let previous_state = decoder.state.snapshot();
@@ -60,7 +62,7 @@ fn invalid_decode_inputs_preserve_semantic_state_and_emit_no_events() {
     for (llrs, erasures, expected_error) in errors {
         let mut events = Events::default();
         assert_eq!(
-            decoder.decode(DecodeInput { llrs, erasures }, Some(&mut events),),
+            decoder.decode(DecodeInput { llrs, erasures }, &mut events,),
             Err(expected_error)
         );
         assert!(events.0.is_empty(), "an invalid block emits no events");

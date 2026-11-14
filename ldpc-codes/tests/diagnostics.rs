@@ -1,9 +1,16 @@
 use std::error::Error;
 
+use coding_core::{Decoder, NoopObserver};
 use ldpc_codes::{
-    count_bit_errors, Bit, DecodeInput, DecodeStatus, Decoder, DecoderConfig, LdpcError,
-    ParityCheckMatrix, SpaDecoder,
+    count_bit_errors, Bit, DecodeInput, DecodeStatus, DecoderConfig, LdpcError, SpaDecoder,
 };
+
+mod common;
+#[path = "common/repetition.rs"]
+mod repetition;
+
+use common::decoded;
+use repetition::repetition_checks;
 
 #[test]
 fn counts_equal_multiple_all_and_empty_bit_sequences_without_changing_inputs() {
@@ -47,20 +54,20 @@ fn different_lengths_report_expected_and_actual_lengths_without_a_source() {
 
 #[test]
 fn parity_satisfied_word_can_have_three_errors_against_the_reference() {
-    let checks = ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1], vec![1, 2]])
-        .expect("repetition-code matrix is valid");
-    let mut decoder = SpaDecoder::try_new(checks, DecoderConfig::default())
+    let mut decoder = SpaDecoder::try_new(repetition_checks(), DecoderConfig::default())
         .expect("valid repetition-code matrix");
     let transmitted = [Bit::One; 3];
-    let result = decoder
-        .decode(
-            DecodeInput {
-                llrs: &[1.0, 1.0, 1.0],
-                erasures: &[],
-            },
-            None,
-        )
-        .expect("positive LLRs produce a valid zero word");
+    let result = decoded(
+        decoder
+            .decode(
+                DecodeInput {
+                    llrs: &[1.0, 1.0, 1.0],
+                    erasures: &[],
+                },
+                &mut NoopObserver,
+            )
+            .expect("positive LLRs produce a valid zero word"),
+    );
 
     assert_eq!(result.word(), [Bit::Zero; 3]);
     assert_eq!(result.status(), DecodeStatus::ParitySatisfied);

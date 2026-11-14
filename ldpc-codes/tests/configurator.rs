@@ -1,7 +1,11 @@
+use coding_core::{Decoder, Encoder, NoopObserver};
 use ldpc_codes::{
-    Bit, DecodeInput, DecodeStatus, DecoderConfig, Encoder, LdpcConfigurator, LdpcError,
-    ParityCheckMatrix,
+    Bit, DecodeInput, DecodeStatus, DecoderConfig, LdpcConfigurator, LdpcError, ParityCheckMatrix,
 };
+
+mod common;
+
+use common::decoded;
 
 fn checks_with_dependent_and_empty_rows() -> ParityCheckMatrix {
     ParityCheckMatrix::try_from_rows(5, vec![vec![0, 1, 4], vec![2, 3, 4], vec![0, 1, 4], vec![]])
@@ -23,13 +27,19 @@ fn build_derives_dimensions_and_nonleading_information_positions_from_rank() {
     assert_eq!(encoder.parity_positions(), &[0, 2]);
 
     let message = [Bit::One, Bit::Zero, Bit::Zero];
-    let codeword = encoder.encode(&message).expect("message has length k");
+    let codeword = configured
+        .encode(&message, &mut NoopObserver)
+        .expect("message has length k")
+        .0;
     assert_eq!(
         codeword,
         [Bit::One, Bit::One, Bit::Zero, Bit::Zero, Bit::Zero]
     );
     assert_eq!(expected_checks.syndrome(&codeword).unwrap(), [Bit::Zero; 4]);
-    assert_eq!(encoder.extract_message(&codeword), Ok(message.to_vec()));
+    assert_eq!(
+        configured.encoder().extract_message(&codeword),
+        Ok(message.to_vec())
+    );
 
     let llrs: Vec<_> = codeword
         .iter()
@@ -38,15 +48,17 @@ fn build_derives_dimensions_and_nonleading_information_positions_from_rank() {
             Bit::One => -3.0,
         })
         .collect();
-    let result = configured
-        .decode(
-            DecodeInput {
-                llrs: &llrs,
-                erasures: &[],
-            },
-            None,
-        )
-        .expect("a valid noiseless block can be decoded");
+    let result = decoded(
+        configured
+            .decode(
+                DecodeInput {
+                    llrs: &llrs,
+                    erasures: &[],
+                },
+                &mut NoopObserver,
+            )
+            .expect("a valid noiseless block can be decoded"),
+    );
 
     assert_eq!(result.word(), codeword);
     assert_eq!(result.posterior_llrs(), llrs);
@@ -67,15 +79,17 @@ fn decoder_syndrome_keeps_duplicate_and_empty_source_rows_in_order() {
     )
     .expect("dependent and empty checks are allowed");
 
-    let result = configured
-        .decode(
-            DecodeInput {
-                llrs: &[-1.0, 1.0, 1.0, 1.0, 1.0],
-                erasures: &[],
-            },
-            None,
-        )
-        .expect("the input has the expected length");
+    let result = decoded(
+        configured
+            .decode(
+                DecodeInput {
+                    llrs: &[-1.0, 1.0, 1.0, 1.0, 1.0],
+                    erasures: &[],
+                },
+                &mut NoopObserver,
+            )
+            .expect("the input has the expected length"),
+    );
 
     assert_eq!(
         result.word(),

@@ -1,6 +1,7 @@
+use coding_core::{Decoder, Encoder, NoopObserver};
 use ldpc_codes::{
     bits_to_vector, count_bit_errors, vector_to_bits, Bit, DecodeInput, DecodeStatus,
-    DecoderConfig, Encoder, LdpcConfigurator, LdpcError, ParityCheckMatrix,
+    DecoderConfig, LdpcConfigurator, LdpcError, ParityCheckMatrix,
 };
 
 fn main() -> Result<(), LdpcError> {
@@ -10,15 +11,20 @@ fn main() -> Result<(), LdpcError> {
 
     let checks = ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1], vec![1, 2]])?;
     let mut configured = LdpcConfigurator::build(checks, DecoderConfig::try_new(1, 20.0)?)?;
-    let encoded_word = configured.encoder().encode(&message)?;
+    let encoded_word = configured.encode(&message, &mut NoopObserver)?.0;
     let llrs = [-2.0, 1.0, -3.0];
-    let result = configured.decode(
+    let candidate = match configured.decode(
         DecodeInput {
             llrs: &llrs,
             erasures: &[],
         },
-        None,
-    )?;
+        &mut NoopObserver,
+    )? {
+        coding_core::DecodeOutcome::Candidate(candidate) => candidate,
+        coding_core::DecodeOutcome::NeedMore(reason) => match reason {},
+        coding_core::DecodeOutcome::Stopped(reason) => match reason {},
+    };
+    let result = candidate.value;
 
     println!("Статус декодирования: {:?}", result.status());
     println!("Итоговое слово: {:?}", result.word());

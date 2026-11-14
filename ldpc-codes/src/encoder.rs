@@ -1,49 +1,9 @@
+use coding_core::{Codeword, Observer};
 use gf_linalg::Matrix;
 
 use crate::bit::count_ones;
 use crate::size::check_buffer_bytes;
 use crate::{bits_to_vector, vector_to_bits, Bit, Gf2, LdpcError, ParityCheckMatrix};
-
-/// Общий контракт систематического кодера двоичного блока.
-///
-/// Длина сообщения и слова определяется конкретным кодером. Методы читают
-/// входные срезы и не изменяют ни их, ни состояние кодера.
-pub trait Encoder {
-    /// Возвращает число информационных битов `k`.
-    fn message_len(&self) -> usize;
-
-    /// Возвращает число битов кодового слова `n`.
-    fn codeword_len(&self) -> usize;
-
-    /// Кодирует сообщение длины `k` в слово длины `n`.
-    ///
-    /// Информационные биты сохраняются в позициях, заданных кодером; итоговое
-    /// слово возвращается в порядке столбцов исходной проверочной матрицы. Для
-    /// [`SystematicEncoder`] бит `message[j]` находится в
-    /// `word[SystematicEncoder::information_positions()[j]]`.
-    ///
-    /// # Errors
-    ///
-    /// Возвращает [`LdpcError::MessageLengthMismatch`], если длина сообщения
-    /// не равна [`message_len`](Self::message_len), или ошибку линейной
-    /// алгебры/преобразования, если соответствующая операция завершилась
-    /// ошибкой.
-    fn encode(&self, message: &[Bit]) -> Result<Vec<Bit>, LdpcError>;
-
-    /// Извлекает сообщение из допустимого кодового слова длины `n`.
-    ///
-    /// Сначала проверяется длина слова, затем его синдром по исходной
-    /// проверочной матрице. Метод не исправляет ошибки и не определяет, какое
-    /// допустимое слово было передано. Любое другое слово с нулевым синдромом
-    /// также принимается.
-    ///
-    /// # Errors
-    ///
-    /// Возвращает [`LdpcError::WordLengthMismatch`], если длина слова неверна,
-    /// или [`LdpcError::InvalidCodeword`], если слово нарушает исходные
-    /// проверки.
-    fn extract_message(&self, word: &[Bit]) -> Result<Vec<Bit>, LdpcError>;
-}
 
 fn dense_from_checks(checks: &ParityCheckMatrix) -> Result<Matrix<Gf2>, LdpcError> {
     let rows = checks.rows();
@@ -67,11 +27,10 @@ fn dense_from_checks(checks: &ParityCheckMatrix) -> Result<Matrix<Gf2>, LdpcErro
 
 /// Систематический кодер, подготовленный по проверочной матрице `H`.
 ///
-/// Кодер выбирает непивотные столбцы как информационные, а опорные столбцы —
-/// как проверочные. Позиции возвращаются в порядке столбцов исходной `H`, и
-/// `message[j]` помещается в `word[information_positions()[j]]`.
-/// Создать значение можно только через [`try_new`](Self::try_new), который
-/// отвергает нулевой и полный ранг.
+/// Информационные столбцы — непивотные, проверочные — пивотные. Все позиции
+/// возвращаются в порядке столбцов исходной `H`, поэтому `message[j]` попадает
+/// в `word[information_positions()[j]]`. Создать значение можно только через
+/// [`try_new`](Self::try_new), который отвергает нулевой и полный ранг.
 #[derive(Debug)]
 pub struct SystematicEncoder {
     checks: ParityCheckMatrix,
@@ -80,23 +39,21 @@ pub struct SystematicEncoder {
 }
 
 impl SystematicEncoder {
-    /// Подготавливает систематический кодер по проверочной матрице.
+    /// Подготавливает систематический кодер и забирает `checks` по значению.
     ///
-    /// Забирает `checks` по значению и хранит исходную матрицу внутри кодера;
-    /// дополнительных настраиваемых параметров нет.
+    /// Позиции информационных и проверочных столбцов определяются по RREF;
+    /// см. [`information_positions`](Self::information_positions).
     ///
-    /// Вычисляется один RREF матрицы `H`. Непивотные столбцы в возрастающем
-    /// порядке становятся информационными, пивотные — проверочными. Строки,
-    /// зависимые от предыдущих, учитываются через ранг, а не как отдельные
-    /// проверочные биты.
-    ///
-    /// # Errors
+    /// # Ошибки
     ///
     /// Возвращает [`LdpcError::InvalidEncoderRank`], если ранг равен нулю или
     /// числу столбцов. Ошибки плотной линейной алгебры и переполнения размеров
     /// передаются как [`LdpcError::LinearAlgebra`] и [`LdpcError::SizeOverflow`].
     pub fn try_new(checks: ParityCheckMatrix) -> Result<Self, LdpcError> {
         let dense = dense_from_checks(&checks)?;
+        // Один RREF даёт пивотные (проверочные) и непивотные (информационные)
+        // столбцы. Зависимые строки не становятся отдельными проверочными
+        // битами: их число учитывает ранг.
         let reduced = dense.rref();
         let rank = reduced.rank();
         let cols = checks.cols();
@@ -141,6 +98,50 @@ impl SystematicEncoder {
         })
     }
 
+    /// Возвращает число информационных битов `k`.
+    #[must_use]
+    pub fn message_len(&self) -> usize {
+        self.parity_coefficients.cols()
+    }
+
+    /// Возвращает число битов кодового слова `n`.
+    #[must_use]
+    pub fn codeword_len(&self) -> usize {
+        self.checks.cols()
+    }
+
+    /// Извлекает сообщение из допустимого кодового слова длины `n`.
+    ///
+    /// Сначала проверяется длина слова, затем его синдром по исходной
+    /// проверочной матрице. Метод не исправляет ошибки и не определяет, какое
+    /// допустимое слово было передано. Любое другое слово с нулевым синдромом
+    /// также принимается.
+    ///
+    /// # Errors
+    ///
+    /// Возвращает [`LdpcError::WordLengthMismatch`], если длина слова неверна,
+    /// или [`LdpcError::InvalidCodeword`], если слово нарушает исходные
+    /// проверки.
+    pub fn extract_message(&self, word: &[Bit]) -> Result<Vec<Bit>, LdpcError> {
+        let expected = self.codeword_len();
+        if word.len() != expected {
+            return Err(LdpcError::WordLengthMismatch {
+                expected,
+                actual: word.len(),
+            });
+        }
+
+        let unsatisfied_checks = count_ones(&self.checks.syndrome(word)?);
+        if unsatisfied_checks != 0 {
+            return Err(LdpcError::InvalidCodeword { unsatisfied_checks });
+        }
+
+        Ok(self.systematic_to_original[..self.message_len()]
+            .iter()
+            .map(|&position| word[position])
+            .collect())
+    }
+
     /// Возвращает ранг исходной проверочной матрицы.
     #[must_use]
     pub fn rank(&self) -> usize {
@@ -166,16 +167,27 @@ impl SystematicEncoder {
     }
 }
 
-impl Encoder for SystematicEncoder {
-    fn message_len(&self) -> usize {
-        self.parity_coefficients.cols()
-    }
+/// Кодирует сообщение длины `k` в слово длины `n`.
+///
+/// Слово возвращается в порядке столбцов исходной `H`, информационные биты
+/// размещаются по [`SystematicEncoder::information_positions`]. Общий кодер не
+/// отправляет событий, поэтому наблюдатель не вызывается.
+///
+/// # Ошибки
+///
+/// Возвращает [`LdpcError::MessageLengthMismatch`], если длина сообщения не
+/// равна [`SystematicEncoder::message_len`], или ошибку линейной
+/// алгебры/преобразования, если соответствующая операция завершилась ошибкой.
+impl<'a> coding_core::Encoder<&'a [Bit]> for SystematicEncoder {
+    type Output = Codeword<Vec<Bit>>;
+    type Error = LdpcError;
+    type Event = ();
 
-    fn codeword_len(&self) -> usize {
-        self.checks.cols()
-    }
-
-    fn encode(&self, message: &[Bit]) -> Result<Vec<Bit>, LdpcError> {
+    fn encode(
+        &mut self,
+        message: &'a [Bit],
+        _observer: &mut dyn Observer<()>,
+    ) -> Result<Self::Output, Self::Error> {
         let expected = self.message_len();
         if message.len() != expected {
             return Err(LdpcError::MessageLengthMismatch {
@@ -198,162 +210,10 @@ impl Encoder for SystematicEncoder {
             word[position] = bit;
         }
 
-        Ok(word)
-    }
-
-    fn extract_message(&self, word: &[Bit]) -> Result<Vec<Bit>, LdpcError> {
-        let expected = self.codeword_len();
-        if word.len() != expected {
-            return Err(LdpcError::WordLengthMismatch {
-                expected,
-                actual: word.len(),
-            });
-        }
-
-        let unsatisfied_checks = count_ones(&self.checks.syndrome(word)?);
-        if unsatisfied_checks != 0 {
-            return Err(LdpcError::InvalidCodeword { unsatisfied_checks });
-        }
-
-        Ok(self.systematic_to_original[..self.message_len()]
-            .iter()
-            .map(|&position| word[position])
-            .collect())
+        Ok(Codeword(word))
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use gf_linalg::Matrix;
-
-    use crate::{encoder::dense_from_checks, Encoder, Gf2, ParityCheckMatrix, SystematicEncoder};
-
-    #[test]
-    fn dense_conversion_preserves_shape_entries_and_sparse_source() {
-        let checks =
-            ParityCheckMatrix::try_from_rows(4, vec![vec![2, 0], vec![], vec![0, 2], vec![3]])
-                .unwrap();
-
-        let dense = dense_from_checks(&checks).unwrap();
-
-        assert_eq!(dense.rows(), 4);
-        assert_eq!(dense.cols(), 4);
-        assert_eq!(
-            dense.as_slice(),
-            &[
-                Gf2::one(),
-                Gf2::zero(),
-                Gf2::one(),
-                Gf2::zero(),
-                Gf2::zero(),
-                Gf2::zero(),
-                Gf2::zero(),
-                Gf2::zero(),
-                Gf2::one(),
-                Gf2::zero(),
-                Gf2::one(),
-                Gf2::zero(),
-                Gf2::zero(),
-                Gf2::zero(),
-                Gf2::zero(),
-                Gf2::one(),
-            ]
-        );
-
-        assert_eq!(checks.check_bits(0), Some(&[0, 2][..]));
-        assert_eq!(checks.check_bits(1), Some(&[][..]));
-        assert_eq!(checks.check_bits(2), Some(&[0, 2][..]));
-        assert_eq!(checks.bit_checks(0), Some(&[0, 2][..]));
-        assert_eq!(checks.bit_checks(1), Some(&[][..]));
-        assert_eq!(checks.bit_checks(2), Some(&[0, 2][..]));
-        assert_eq!(checks.bit_checks(3), Some(&[3][..]));
-    }
-
-    #[test]
-    fn dense_conversion_keeps_rectangular_dimensions_and_isolated_columns() {
-        let checks = ParityCheckMatrix::try_from_rows(5, vec![vec![4, 1], vec![2]]).unwrap();
-
-        let dense = dense_from_checks(&checks).unwrap();
-
-        assert_eq!(
-            dense,
-            Matrix::try_new(
-                2,
-                5,
-                vec![
-                    Gf2::zero(),
-                    Gf2::one(),
-                    Gf2::zero(),
-                    Gf2::zero(),
-                    Gf2::one(),
-                    Gf2::zero(),
-                    Gf2::zero(),
-                    Gf2::one(),
-                    Gf2::zero(),
-                    Gf2::zero(),
-                ]
-            )
-            .unwrap()
-        );
-        assert_eq!(checks.bit_checks(0), Some(&[][..]));
-        assert_eq!(checks.bit_checks(3), Some(&[][..]));
-    }
-
-    #[test]
-    fn preparation_builds_exact_coefficients_and_mapping_for_main_example() {
-        let checks = ParityCheckMatrix::try_from_rows(
-            6,
-            vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5], vec![2, 3, 5]],
-        )
-        .unwrap();
-
-        let encoder = SystematicEncoder::try_new(checks).unwrap();
-
-        assert_eq!(
-            encoder.parity_coefficients,
-            Matrix::try_new(3, 3, [0, 1, 1, 1, 1, 1, 1, 0, 1].map(Gf2::new).to_vec()).unwrap()
-        );
-        assert_eq!(encoder.systematic_to_original, [3, 4, 5, 0, 1, 2]);
-        assert_mapping_is_permutation(&encoder);
-    }
-
-    #[test]
-    fn preparation_builds_exact_coefficients_and_mapping_for_cycle_three() {
-        let checks =
-            ParityCheckMatrix::try_from_rows(5, vec![vec![0, 1, 4], vec![2, 3, 4]]).unwrap();
-
-        let encoder = SystematicEncoder::try_new(checks).unwrap();
-
-        assert_eq!(
-            encoder.parity_coefficients,
-            Matrix::try_new(2, 3, [1, 0, 1, 0, 1, 1].map(Gf2::new).to_vec()).unwrap()
-        );
-        assert_eq!(encoder.systematic_to_original, [1, 3, 4, 0, 2]);
-        assert_mapping_is_permutation(&encoder);
-    }
-
-    #[test]
-    fn preparation_distinguishes_swap_from_identity_permutation() {
-        let swap = SystematicEncoder::try_new(
-            ParityCheckMatrix::try_from_rows(3, vec![vec![1, 2]]).unwrap(),
-        )
-        .unwrap();
-        assert_eq!(swap.systematic_to_original, [0, 2, 1]);
-        assert_mapping_is_permutation(&swap);
-
-        let identity =
-            SystematicEncoder::try_new(ParityCheckMatrix::try_from_rows(3, vec![vec![2]]).unwrap())
-                .unwrap();
-        assert_eq!(identity.systematic_to_original, [0, 1, 2]);
-        assert_mapping_is_permutation(&identity);
-    }
-
-    fn assert_mapping_is_permutation(encoder: &SystematicEncoder) {
-        let mut sorted_positions = encoder.systematic_to_original.clone();
-        sorted_positions.sort_unstable();
-        assert_eq!(
-            sorted_positions,
-            (0..encoder.codeword_len()).collect::<Vec<_>>()
-        );
-    }
-}
+#[path = "../tests/unit/encoder.rs"]
+mod tests;

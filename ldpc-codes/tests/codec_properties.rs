@@ -1,8 +1,13 @@
+use coding_core::{Decoder, Encoder, NoopObserver};
 use ldpc_codes::{
     bits_to_vector, count_bit_errors, vector_to_bits, Bit, ConfiguredLdpc, DecodeInput,
-    DecodeStatus, DecoderConfig, Encoder, LdpcConfigurator, ParityCheckMatrix,
+    DecodeStatus, DecoderConfig, LdpcConfigurator, ParityCheckMatrix,
 };
 use proptest::prelude::*;
+
+mod common;
+
+use common::decoded;
 
 #[derive(Clone, Debug)]
 struct CodecCase {
@@ -173,9 +178,9 @@ fn assert_noiseless_block(
     assert_eq!(vector_message, message);
 
     let codeword = configured
-        .encoder()
-        .encode(&vector_message)
-        .expect("message length matches the configured code");
+        .encode(&vector_message, &mut NoopObserver)
+        .expect("message length matches the configured code")
+        .0;
     assert_eq!(codeword.len(), dense_checks[0].len());
     assert_eq!(
         dense_xor_syndrome(dense_checks, &codeword),
@@ -191,15 +196,17 @@ fn assert_noiseless_block(
     }
 
     let llrs = strong_llrs(&codeword);
-    let result = configured
-        .decode(
-            DecodeInput {
-                llrs: &llrs,
-                erasures: &[],
-            },
-            None,
-        )
-        .expect("the noiseless LLR block has the expected length");
+    let result = decoded(
+        configured
+            .decode(
+                DecodeInput {
+                    llrs: &llrs,
+                    erasures: &[],
+                },
+                &mut NoopObserver,
+            )
+            .expect("the noiseless LLR block has the expected length"),
+    );
 
     assert_eq!(result.status(), DecodeStatus::ParitySatisfied);
     assert_eq!(result.iterations(), 0);
@@ -264,17 +271,32 @@ proptest! {
         prop_assert_eq!(checks.check_bits(case.rank + 1), Some(&[][..]));
         prop_assert_eq!(checks.bit_checks(checks.cols() - 1), Some(&[][..]));
 
-        let configured = LdpcConfigurator::build(checks, DecoderConfig::default())
+        let mut configured = LdpcConfigurator::build(checks, DecoderConfig::default())
             .expect("the identity block guarantees rank in (0, n)");
-        let encoder = configured.encoder();
-        prop_assert_eq!(encoder.rank(), case.rank);
-        prop_assert_eq!(encoder.message_len(), case.dense_checks[0].len() - case.rank);
-        prop_assert!(encoder.information_positions().iter().all(|&position| position > 0));
+        prop_assert_eq!(configured.encoder().rank(), case.rank);
+        prop_assert_eq!(
+            configured.encoder().message_len(),
+            case.dense_checks[0].len() - case.rank
+        );
+        prop_assert!(configured
+            .encoder()
+            .information_positions()
+            .iter()
+            .all(|&position| position > 0));
 
         let combined_message = xor_bits(&case.first_message, &case.second_message);
-        let first_word = encoder.encode(&case.first_message).expect("message length is valid");
-        let second_word = encoder.encode(&case.second_message).expect("message length is valid");
-        let combined_word = encoder.encode(&combined_message).expect("message length is valid");
+        let first_word = configured
+            .encode(&case.first_message, &mut NoopObserver)
+            .expect("message length is valid")
+            .0;
+        let second_word = configured
+            .encode(&case.second_message, &mut NoopObserver)
+            .expect("message length is valid")
+            .0;
+        let combined_word = configured
+            .encode(&combined_message, &mut NoopObserver)
+            .expect("message length is valid")
+            .0;
         let expected_combined_word = xor_bits(&first_word, &second_word);
 
         prop_assert_eq!(&combined_word, &expected_combined_word);
@@ -322,24 +344,34 @@ proptest! {
         prop_assert_ne!(isolated_position, columns - 1);
 
         let checks = checks_from_dense(&permuted_checks);
-        let configured = LdpcConfigurator::build(checks, DecoderConfig::default())
+        let mut configured = LdpcConfigurator::build(checks, DecoderConfig::default())
             .expect("column permutation preserves the generated rank");
-        let encoder = configured.encoder();
-        prop_assert_eq!(encoder.rank(), case.rank);
-        prop_assert!(encoder.information_positions().contains(&isolated_position));
+        prop_assert_eq!(configured.encoder().rank(), case.rank);
+        prop_assert!(configured
+            .encoder()
+            .information_positions()
+            .contains(&isolated_position));
 
         let message = &case.first_message;
-        let codeword = encoder.encode(message).expect("message length matches the code");
+        let codeword = configured
+            .encode(message, &mut NoopObserver)
+            .expect("message length matches the code")
+            .0;
         prop_assert_eq!(codeword.len(), columns);
         prop_assert_eq!(
             dense_xor_syndrome(&permuted_checks, &codeword),
             vec![0; permuted_checks.len()]
         );
-        for (&position, &bit) in encoder.information_positions().iter().zip(message) {
+        for (&position, &bit) in configured
+            .encoder()
+            .information_positions()
+            .iter()
+            .zip(message)
+        {
             prop_assert_eq!(codeword[position], bit);
         }
         prop_assert_eq!(
-            encoder.extract_message(&codeword),
+            configured.encoder().extract_message(&codeword),
             Ok(message.clone())
         );
     }

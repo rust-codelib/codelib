@@ -1,37 +1,39 @@
+use core::convert::Infallible;
+
+use coding_core::{Candidate, DecodeOutcome, Decoder, Observer};
 use ldpc_codes::{
-    Bit, DecodeEvent, DecodeInput, DecodeObserver, DecodeResult, DecodeStatus, Decoder, LdpcError,
-    ParityCheckMatrix,
+    Bit, DecodeChecks, DecodeEvent, DecodeInput, DecodeResult, DecodeStatus, LdpcDecodeOutcome,
+    LdpcError, ParityCheckMatrix,
 };
 
-fn checks() -> ParityCheckMatrix {
-    ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1], vec![1, 2]])
-        .expect("the hand-calculated matrix is valid")
-}
+mod common;
+#[path = "common/events.rs"]
+mod events;
+#[path = "common/repetition.rs"]
+mod repetition;
 
-#[derive(Default)]
-struct Events(Vec<DecodeEvent>);
-
-impl DecodeObserver for Events {
-    fn on_event(&mut self, event: &DecodeEvent) {
-        self.0.push(*event);
-    }
-}
+use common::decoded;
+use events::Events;
+use repetition::repetition_checks;
 
 struct ExternalDecoder {
     checks: ParityCheckMatrix,
 }
 
-impl Decoder for ExternalDecoder {
-    fn codeword_len(&self) -> usize {
-        self.checks.cols()
-    }
+impl<'a> Decoder<DecodeInput<'a>> for ExternalDecoder {
+    type Value = DecodeResult;
+    type Checks = DecodeChecks;
+    type NeedMore = Infallible;
+    type StopReason = Infallible;
+    type Error = LdpcError;
+    type Event = DecodeEvent;
 
     fn decode(
         &mut self,
-        input: DecodeInput<'_>,
-        observer: Option<&mut dyn DecodeObserver>,
-    ) -> Result<DecodeResult, LdpcError> {
-        let bits = self.codeword_len();
+        input: DecodeInput<'a>,
+        observer: &mut dyn Observer<DecodeEvent>,
+    ) -> Result<LdpcDecodeOutcome, LdpcError> {
+        let bits = self.checks.cols();
         if input.llrs.len() != bits {
             return Err(LdpcError::LlrLengthMismatch {
                 expected: bits,
@@ -73,41 +75,47 @@ impl Decoder for ExternalDecoder {
             5,
         )?;
 
-        if let Some(observer) = observer {
-            observer.on_event(&DecodeEvent::Started {
-                unsatisfied_checks: result.initial_unsatisfied_checks(),
-            });
-            observer.on_event(&DecodeEvent::IterationFinished {
-                iteration: 1,
-                unsatisfied_checks: result.final_unsatisfied_checks(),
-                changed_bits: result.changed_bits(),
-            });
-            observer.on_event(&DecodeEvent::Finished {
-                iterations: result.iterations(),
-                status: result.status(),
-                unsatisfied_checks: result.final_unsatisfied_checks(),
-                changed_bits: result.changed_bits(),
-            });
-        }
+        observer.on_event(&DecodeEvent::Started {
+            unsatisfied_checks: result.initial_unsatisfied_checks(),
+        });
+        observer.on_event(&DecodeEvent::IterationFinished {
+            iteration: 1,
+            unsatisfied_checks: result.final_unsatisfied_checks(),
+            changed_bits: result.changed_bits(),
+        });
+        observer.on_event(&DecodeEvent::Finished {
+            iterations: result.iterations(),
+            status: result.status(),
+            unsatisfied_checks: result.final_unsatisfied_checks(),
+            changed_bits: result.changed_bits(),
+        });
 
-        Ok(result)
+        let checks = result.checks();
+        Ok(DecodeOutcome::Candidate(Candidate {
+            value: result,
+            checks,
+        }))
     }
 }
 
 #[test]
 fn external_decoder_can_return_its_own_successful_result_and_events() {
-    let mut decoder = ExternalDecoder { checks: checks() };
+    let mut decoder = ExternalDecoder {
+        checks: repetition_checks(),
+    };
     let llrs = [-1.0, 1.0, 3.0];
     let mut events = Events::default();
-    let result = decoder
-        .decode(
-            DecodeInput {
-                llrs: &llrs,
-                erasures: &[],
-            },
-            Some(&mut events),
-        )
-        .expect("the external decoder builds a valid result from the input");
+    let result = decoded(
+        decoder
+            .decode(
+                DecodeInput {
+                    llrs: &llrs,
+                    erasures: &[],
+                },
+                &mut events,
+            )
+            .expect("the external decoder builds a valid result from the input"),
+    );
 
     assert_eq!(result.word(), [Bit::Zero, Bit::Zero, Bit::Zero]);
     assert_eq!(result.posterior_llrs(), [2.0, 0.0, -0.0]);
@@ -140,14 +148,16 @@ fn external_decoder_can_return_its_own_successful_result_and_events() {
 
 #[test]
 fn external_decoder_validates_input_length_before_sending_events() {
-    let mut decoder = ExternalDecoder { checks: checks() };
+    let mut decoder = ExternalDecoder {
+        checks: repetition_checks(),
+    };
     let mut events = Events::default();
     let result = decoder.decode(
         DecodeInput {
             llrs: &[1.0],
             erasures: &[],
         },
-        Some(&mut events),
+        &mut events,
     );
 
     assert_eq!(
@@ -163,7 +173,7 @@ fn external_decoder_validates_input_length_before_sending_events() {
 #[test]
 fn result_constructor_rejects_mismatched_word_length() {
     let error = DecodeResult::try_new(
-        &checks(),
+        &repetition_checks(),
         &[Bit::Zero],
         vec![1.0, 1.0, 1.0],
         DecodeStatus::ParitySatisfied,
@@ -184,7 +194,7 @@ fn result_constructor_rejects_mismatched_word_length() {
 #[test]
 fn result_constructor_rejects_mismatched_posterior_length() {
     let error = DecodeResult::try_new(
-        &checks(),
+        &repetition_checks(),
         &[Bit::Zero; 3],
         vec![1.0, 1.0],
         DecodeStatus::ParitySatisfied,
@@ -206,7 +216,7 @@ fn result_constructor_rejects_mismatched_posterior_length() {
 fn result_constructor_rejects_non_finite_posterior_values() {
     for non_finite in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         let error = DecodeResult::try_new(
-            &checks(),
+            &repetition_checks(),
             &[Bit::Zero; 3],
             vec![1.0, non_finite, 1.0],
             DecodeStatus::ParitySatisfied,
@@ -222,7 +232,7 @@ fn result_constructor_rejects_non_finite_posterior_values() {
 #[test]
 fn result_constructor_rejects_a_status_that_disagrees_with_the_syndrome() {
     let error = DecodeResult::try_new(
-        &checks(),
+        &repetition_checks(),
         &[Bit::Zero; 3],
         vec![1.0, -1.0, 1.0],
         DecodeStatus::ParitySatisfied,
@@ -237,7 +247,7 @@ fn result_constructor_rejects_a_status_that_disagrees_with_the_syndrome() {
 #[test]
 fn iteration_limit_status_requires_a_nonzero_syndrome_and_exhausted_budget() {
     let satisfied_error = DecodeResult::try_new(
-        &checks(),
+        &repetition_checks(),
         &[Bit::Zero; 3],
         vec![1.0, 1.0, 1.0],
         DecodeStatus::IterationLimit,
@@ -248,7 +258,7 @@ fn iteration_limit_status_requires_a_nonzero_syndrome_and_exhausted_budget() {
     assert_eq!(satisfied_error, LdpcError::DecodeResultStatusMismatch);
 
     let incomplete_error = DecodeResult::try_new(
-        &checks(),
+        &repetition_checks(),
         &[Bit::Zero; 3],
         vec![1.0, -1.0, 1.0],
         DecodeStatus::IterationLimit,
@@ -262,7 +272,7 @@ fn iteration_limit_status_requires_a_nonzero_syndrome_and_exhausted_budget() {
 #[test]
 fn iteration_limit_results_are_constructible_at_zero_and_positive_budgets() {
     let zero_budget = DecodeResult::try_new(
-        &checks(),
+        &repetition_checks(),
         &[Bit::Zero, Bit::One, Bit::Zero],
         vec![1.0, -1.0, 1.0],
         DecodeStatus::IterationLimit,
@@ -280,7 +290,7 @@ fn iteration_limit_results_are_constructible_at_zero_and_positive_budgets() {
     assert_eq!(zero_budget.final_unsatisfied_checks(), 2);
 
     let positive_budget = DecodeResult::try_new(
-        &checks(),
+        &repetition_checks(),
         &[Bit::Zero; 3],
         vec![1.0, -1.0, 1.0],
         DecodeStatus::IterationLimit,
@@ -301,7 +311,7 @@ fn iteration_limit_results_are_constructible_at_zero_and_positive_budgets() {
 #[test]
 fn result_constructor_rejects_iterations_above_the_declared_budget() {
     let error = DecodeResult::try_new(
-        &checks(),
+        &repetition_checks(),
         &[Bit::Zero; 3],
         vec![1.0, 1.0, 1.0],
         DecodeStatus::ParitySatisfied,
@@ -322,7 +332,7 @@ fn result_constructor_rejects_iterations_above_the_declared_budget() {
 #[test]
 fn zero_iterations_require_the_initial_and_final_hard_words_to_match() {
     let error = DecodeResult::try_new(
-        &checks(),
+        &repetition_checks(),
         &[Bit::One, Bit::Zero, Bit::Zero],
         vec![1.0, 1.0, 1.0],
         DecodeStatus::ParitySatisfied,

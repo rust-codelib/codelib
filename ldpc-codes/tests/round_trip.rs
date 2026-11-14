@@ -1,24 +1,22 @@
+use coding_core::{Decoder, Encoder, NoopObserver};
 use ldpc_codes::{
     bits_to_vector, count_bit_errors, vector_to_bits, Bit, DecodeInput, DecodeStatus,
-    DecoderConfig, Encoder, LdpcConfigurator, ParityCheckMatrix,
+    DecoderConfig, LdpcConfigurator,
 };
 
-fn main_checks() -> ParityCheckMatrix {
-    ParityCheckMatrix::try_from_rows(
-        6,
-        vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5], vec![2, 3, 5]],
-    )
-    .expect("the main example matrix is valid")
-}
+mod common;
+#[path = "common/general_plan.rs"]
+mod general_plan;
+#[path = "common/repetition.rs"]
+mod repetition;
 
-fn repeat_checks() -> ParityCheckMatrix {
-    ParityCheckMatrix::try_from_rows(3, vec![vec![0, 1], vec![1, 2]])
-        .expect("the repetition-code matrix is valid")
-}
+use common::decoded;
+use general_plan::general_plan_checks;
+use repetition::repetition_checks;
 
 #[test]
 fn noiseless_round_trip_preserves_zero_and_trailing_zero_messages() {
-    let mut configured = LdpcConfigurator::build(main_checks(), DecoderConfig::default())
+    let mut configured = LdpcConfigurator::build(general_plan_checks(), DecoderConfig::default())
         .expect("rank three gives a valid three-bit message");
     assert_eq!(configured.encoder().message_len(), 3);
     assert_eq!(configured.encoder().information_positions(), &[3, 4, 5]);
@@ -33,9 +31,9 @@ fn noiseless_round_trip_preserves_zero_and_trailing_zero_messages() {
         assert_eq!(message_bits, message);
 
         let codeword = configured
-            .encoder()
-            .encode(&message_bits)
-            .expect("message has length k");
+            .encode(&message_bits, &mut NoopObserver)
+            .expect("message has length k")
+            .0;
         let llrs: Vec<_> = codeword
             .iter()
             .map(|bit| match bit {
@@ -43,15 +41,17 @@ fn noiseless_round_trip_preserves_zero_and_trailing_zero_messages() {
                 Bit::One => -3.0,
             })
             .collect();
-        let result = configured
-            .decode(
-                DecodeInput {
-                    llrs: &llrs,
-                    erasures: &[],
-                },
-                None,
-            )
-            .expect("the LLR block has the expected length");
+        let result = decoded(
+            configured
+                .decode(
+                    DecodeInput {
+                        llrs: &llrs,
+                        erasures: &[],
+                    },
+                    &mut NoopObserver,
+                )
+                .expect("the LLR block has the expected length"),
+        );
 
         assert_eq!(result.status(), DecodeStatus::ParitySatisfied);
         assert_eq!(result.iterations(), 0);
@@ -77,26 +77,28 @@ fn spa_corrects_the_planned_channel_values_and_round_trips_the_message() {
     let message_vector = bits_to_vector(&[Bit::One]);
     let message = vector_to_bits(&message_vector).expect("GF(2) values are bits");
     let mut configured = LdpcConfigurator::build(
-        repeat_checks(),
+        repetition_checks(),
         DecoderConfig::try_new(1, 20.0).expect("the LLR limit is valid"),
     )
     .expect("the repetition code has a valid encoder rank");
     let codeword = configured
-        .encoder()
-        .encode(&message)
-        .expect("message has length k");
+        .encode(&message, &mut NoopObserver)
+        .expect("message has length k")
+        .0;
     assert_eq!(codeword, [Bit::One, Bit::One, Bit::One]);
 
     let llrs = [-2.0, 1.0, -3.0];
-    let result = configured
-        .decode(
-            DecodeInput {
-                llrs: &llrs,
-                erasures: &[],
-            },
-            None,
-        )
-        .expect("the LLR block has the expected length");
+    let result = decoded(
+        configured
+            .decode(
+                DecodeInput {
+                    llrs: &llrs,
+                    erasures: &[],
+                },
+                &mut NoopObserver,
+            )
+            .expect("the LLR block has the expected length"),
+    );
 
     assert_eq!(result.status(), DecodeStatus::ParitySatisfied);
     assert_eq!(result.iterations(), 1);
@@ -116,24 +118,26 @@ fn spa_corrects_the_planned_channel_values_and_round_trips_the_message() {
 #[test]
 fn exhausted_iteration_budget_reports_status_without_extracting_message() {
     let mut configured = LdpcConfigurator::build(
-        repeat_checks(),
+        repetition_checks(),
         DecoderConfig::try_new(0, 20.0).expect("zero iterations is a valid budget"),
     )
     .expect("the repetition code has a valid encoder rank");
     let expected_codeword = configured
-        .encoder()
-        .encode(&[Bit::One])
-        .expect("message has length k");
+        .encode(&[Bit::One], &mut NoopObserver)
+        .expect("message has length k")
+        .0;
     let llrs = [-2.0, 1.0, -3.0];
-    let result = configured
-        .decode(
-            DecodeInput {
-                llrs: &llrs,
-                erasures: &[],
-            },
-            None,
-        )
-        .expect("the LLR block is valid even if it cannot be decoded yet");
+    let result = decoded(
+        configured
+            .decode(
+                DecodeInput {
+                    llrs: &llrs,
+                    erasures: &[],
+                },
+                &mut NoopObserver,
+            )
+            .expect("the LLR block is valid even if it cannot be decoded yet"),
+    );
 
     assert_eq!(result.status(), DecodeStatus::IterationLimit);
     assert_eq!(result.iterations(), 0);

@@ -1,4 +1,5 @@
-use ldpc_codes::{Bit, Encoder, LdpcError, ParityCheckMatrix, SystematicEncoder};
+use coding_core::{Encoder, NoopObserver};
+use ldpc_codes::{Bit, LdpcError, ParityCheckMatrix, SystematicEncoder};
 
 fn main() -> Result<(), LdpcError> {
     // Четвёртая строка — XOR первых трёх, поэтому ранг равен 3.
@@ -6,10 +7,10 @@ fn main() -> Result<(), LdpcError> {
         6,
         vec![vec![0, 1, 3], vec![1, 2, 4], vec![0, 4, 5], vec![2, 3, 5]],
     )?;
-    let encoder = SystematicEncoder::try_new(checks)?;
+    let mut encoder = SystematicEncoder::try_new(checks)?;
 
     let message = [Bit::Zero, Bit::One, Bit::One];
-    let word = encoder.encode(&message)?;
+    let word = encoder.encode(&message, &mut NoopObserver)?.0;
 
     assert_eq!(encoder.message_len(), 3);
     assert_eq!(encoder.codeword_len(), 6);
