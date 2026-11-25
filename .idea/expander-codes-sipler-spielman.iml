@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="EMPTY_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/cascade-codes/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cascade-codes/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cascade-codes/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/gf-linalg/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/gf-linalg/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/gf2m/benches" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/gf2m/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/gf2m/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/gf2m/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/gfpm/benches" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/gfpm/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/gfpm/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/gfpm/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/ldpc-codes/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ldpc-codes/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ldpc-codes/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/rs-codes/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/rs-codes/tests" isTestSource="true" />
+      <excludeFolder url="file://$MODULE_DIR$/target" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>
