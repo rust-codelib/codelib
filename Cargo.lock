@@ -358,6 +358,7 @@ dependencies = [
  "gf-linalg",
  "gfpm",
  "proptest",
+ "rand",
 ]
 
 [[package]]
